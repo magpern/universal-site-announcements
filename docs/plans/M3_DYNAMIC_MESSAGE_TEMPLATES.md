@@ -312,3 +312,13 @@ Retain and extend free-shipping diagnostics with template/token validity (includ
 |---------|------|-------|
 | 0.1-draft | 2026-08-23 | Initial M3 draft for PO approval |
 | 1.0-frozen | 2026-08-23 | Freeze — PO approved; HTML-aware validation and hybrid UMC locked |
+
+---
+
+## 15. Closure
+
+**Status:** CLOSED (implementation)  
+**Version:** 0.3.0  
+**Closure document:** [m3-dynamic-message-templates.md](../closure/m3-dynamic-message-templates.md)
+
+Implemented on `feature/m3-dynamic-message-templates` and merged to `main`. See closure for DEV evidence and migration notes.

@@ -12,7 +12,7 @@ namespace USA\Admin;
 use USA\Settings;
 
 /**
- * Throttled admin notice when content replacement fails.
+ * Throttled admin notice when content replacement or template resolution fails.
  */
 final class DiagnosticsNotice {
 
@@ -57,12 +57,31 @@ final class DiagnosticsNotice {
 			return;
 		}
 
+		$code    = (string) $data['code'];
+		$message = $this->message_for_code( $code );
+
 		printf(
 			'<div class="notice notice-warning"><p>%s</p></div>',
-			esc_html__(
-				'Universal Site Announcements could not safely replace the Store Notice markup. Upstream HTML was left unchanged. Check that the host notice still uses a paragraph with classes woocommerce-store-notice and demo_store.',
+			esc_html( $message )
+		);
+	}
+
+	/**
+	 * Human-readable message for a failure code.
+	 *
+	 * @param string $code Failure code.
+	 */
+	private function message_for_code( string $code ): string {
+		if ( 0 === strpos( $code, 'template_' ) || 0 === strpos( $code, 'fs_' ) ) {
+			return __(
+				'Universal Site Announcements suppressed one or more announcements due to an invalid template, unresolved merge tag, or free-shipping threshold failure. Check announcement diagnostics on the edit screen.',
 				'universal-site-announcements'
-			)
+			);
+		}
+
+		return __(
+			'Universal Site Announcements could not safely replace the Store Notice markup. Upstream HTML was left unchanged. Check that the host notice still uses a paragraph with classes woocommerce-store-notice and demo_store.',
+			'universal-site-announcements'
 		);
 	}
 }

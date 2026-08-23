@@ -1,6 +1,6 @@
 <?php
 /**
- * Free-shipping provider / UMC consumer contract tests.
+ * Free-shipping provider / hybrid UMC contract tests.
  *
  * @package UniversalSiteAnnouncements
  */
@@ -11,12 +11,14 @@ namespace USA\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use USA\Announcement\Sanitizer;
+use USA\Lifecycle\Schema;
 use USA\Provider\EligibilityGate;
+use USA\Provider\UmcActivity;
 use USA\Provider\UmcThresholdDisplay;
 use USA\Provider\WooCommerceFreeShippingProvider;
 
 /**
- * Proves USA does not multiply rates/round; uses formatted_html as-is.
+ * Proves USA uses formatted_html / wc_price as-is; never invents currency math.
  */
 final class FreeShippingProviderContractTest extends TestCase {
 
@@ -53,38 +55,62 @@ final class FreeShippingProviderContractTest extends TestCase {
 	}
 
 	/**
-	 * Base-currency formatted_html is used unchanged in the message (no rate math).
+	 * Hybrid: UMC inactive → wc_price base HTML sanitised (no rate math).
 	 */
-	public function test_base_formatted_html_used_as_is(): void {
+	public function test_hybrid_inactive_uses_wc_price(): void {
 		$formatted = '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">€</span>200.00</bdi></span>';
-		$seen_base = null;
-		$provider  = $this->provider_with_gateway(
-			static function ( string $base ) use ( $formatted, &$seen_base ): array {
-				$seen_base = $base;
-				return array(
-					'formatted_html' => $formatted,
-					'amount'         => '200.00',
-					'currency_code'  => 'EUR',
-				);
+		$activity  = new UmcActivity(
+			static function (): bool {
+				return false;
+			},
+			null,
+			static function ( string $base ) use ( $formatted ): string {
+				unset( $base );
+				return $formatted;
 			}
 		);
-
-		$message = $provider->build_message( $formatted );
-		$this->assertNull( $seen_base ); // build_message must not call the gateway.
-		$this->assertStringContainsString( $formatted, $message );
-		$this->assertStringContainsString( 'Free shipping on orders of', $message );
-		$this->assertStringContainsString( 'or more', $message );
-		// No invented multiplication artifacts.
-		$this->assertStringNotContainsString( '220.00', $message );
-		$this->assertStringNotContainsString( 'multiply', $message );
+		$umc       = new UmcThresholdDisplay();
+		$sanitizer = new Sanitizer();
+		$html      = $activity->resolve_threshold_html( '200.00', $umc, $sanitizer );
+		$this->assertNotNull( $html );
+		$this->assertStringContainsString( '200.00', $html );
+		$this->assertStringNotContainsString( '220.00', $html );
 	}
 
 	/**
-	 * Foreign-currency formatted_html is concatenated unchanged (no re-round).
+	 * Hybrid: UMC active + API missing → null (no wc_price fallback).
 	 */
-	public function test_foreign_formatted_html_unchanged(): void {
+	public function test_hybrid_active_api_missing_suppresses(): void {
+		$activity = new UmcActivity(
+			static function (): bool {
+				return true;
+			},
+			static function (): bool {
+				return false;
+			},
+			static function (): string {
+				return '<span>SHOULD_NOT_USE</span>';
+			}
+		);
+		$umc = new UmcThresholdDisplay();
+		$this->assertNull( $activity->resolve_threshold_html( '200.00', $umc, new Sanitizer() ) );
+		$this->assertSame( 'umc_api_unavailable', $activity->failure_reason( '200.00', $umc ) );
+	}
+
+	/**
+	 * Hybrid: UMC active + API success → formatted_html unchanged.
+	 */
+	public function test_hybrid_active_api_success(): void {
 		$formatted = '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">$</span>218.00</bdi></span>';
-		$provider  = $this->provider_with_gateway(
+		$activity  = new UmcActivity(
+			static function (): bool {
+				return true;
+			},
+			static function (): bool {
+				return true;
+			}
+		);
+		$umc = new UmcThresholdDisplay(
 			static function () use ( $formatted ): array {
 				return array(
 					'formatted_html' => $formatted,
@@ -93,101 +119,69 @@ final class FreeShippingProviderContractTest extends TestCase {
 				);
 			}
 		);
-
-		$message = $provider->build_message( $formatted );
-		$this->assertSame(
-			'Free shipping on orders of ' . $formatted . ' or more',
-			$message
-		);
-		// Prove builder did not alter the amount digits inside formatted_html.
-		$this->assertStringContainsString( '$</span>218.00', $message );
-		$this->assertStringNotContainsString( '217.99', $message );
-		$this->assertStringNotContainsString( '218.000', $message );
+		$html = $activity->resolve_threshold_html( '200.00', $umc, new Sanitizer() );
+		$this->assertSame( $formatted, $html );
+		$this->assertStringContainsString( '$</span>218.00', $html );
 	}
 
 	/**
-	 * Message builder only concatenates; never calls conversion helpers.
+	 * Hybrid: UMC active + API null → suppress.
 	 */
-	public function test_build_message_does_not_inspect_rates_or_cookies(): void {
-		$calls     = array();
-		$formatted = '<span class="amount">100</span>';
-		$provider  = $this->provider_with_gateway(
-			static function ( string $base ) use ( &$calls, $formatted ): array {
-				$calls[] = $base;
-				return array(
-					'formatted_html' => $formatted,
-					'amount'         => '100',
-					'currency_code'  => 'EUR',
-				);
+	public function test_hybrid_active_api_null_suppresses(): void {
+		$activity = new UmcActivity(
+			static function (): bool {
+				return true;
+			},
+			static function (): bool {
+				return true;
 			}
 		);
-
-		// build_message must not invoke the gateway at all.
-		$out = $provider->build_message( $formatted );
-		$this->assertSame( array(), $calls );
-		$this->assertStringContainsString( $formatted, $out );
+		$umc = new UmcThresholdDisplay(
+			static function (): ?array {
+				return null;
+			}
+		);
+		$this->assertNull( $activity->resolve_threshold_html( '200.00', $umc, new Sanitizer() ) );
 	}
 
 	/**
-	 * resolve_message suppresses when UMC function missing (fail closed).
+	 * Default migration seed constant is the locked English template.
 	 */
-	public function test_resolve_suppresses_when_umc_missing(): void {
+	public function test_default_template_constant(): void {
+		$this->assertSame(
+			'Free shipping on orders of {{free_shipping_threshold}} or more',
+			Schema::DEFAULT_FREE_SHIPPING_TEMPLATE
+		);
+		$this->assertSame( Schema::DEFAULT_FREE_SHIPPING_TEMPLATE, WooCommerceFreeShippingProvider::default_template() );
+	}
+
+	/**
+	 * resolve_message suppresses when WooCommerce missing (fail closed).
+	 */
+	public function test_resolve_suppresses_when_woocommerce_missing(): void {
 		$provider = new WooCommerceFreeShippingProvider(
 			new EligibilityGate(),
 			new UmcThresholdDisplay(),
-			new Sanitizer()
+			new Sanitizer(),
+			new UmcActivity(
+				static function (): bool {
+					return false;
+				}
+			)
 		);
-		// Without WooCommerce, suppresses earlier — still null / fail closed.
 		$this->assertNull( $provider->resolve_message() );
 		$this->assertNotSame( '', $provider->last_suppression_reason() );
-	}
-
-	/**
-	 * Template filter still receives only formatted amount HTML via sprintf.
-	 */
-	public function test_template_filter_uses_formatted_html_placeholder(): void {
-		$formatted = '<span class="woocommerce-Price-amount">99</span>';
-		$GLOBALS['usa_test_filters']['usa_free_shipping_message_template'] = static function () {
-			return 'Ship free from %s today';
-		};
-
-		$provider = $this->provider_with_gateway( null );
-		$message  = $provider->build_message( $formatted );
-		$this->assertSame( 'Ship free from ' . $formatted . ' today', $message );
 	}
 
 	/**
 	 * Price HTML sanitiser keeps wc_price tags, strips scripts.
 	 */
 	public function test_price_html_sanitizer_allowlist(): void {
-		$s = new Sanitizer();
-		$in = '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">€</span>10</bdi></span><script>x</script>';
+		$s   = new Sanitizer();
+		$in  = '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">€</span>10</bdi></span><script>x</script>';
 		$out = $s->sanitize_price_html( $in );
 		$this->assertStringContainsString( 'woocommerce-Price-amount', $out );
 		$this->assertStringContainsString( '<bdi>', $out );
 		$this->assertStringNotContainsString( '<script>', $out );
-	}
-
-	/**
-	 * @param callable(string):(?array{formatted_html:string,amount:string,currency_code:string})|null $gateway Gateway.
-	 */
-	private function provider_with_gateway( ?callable $gateway ): WooCommerceFreeShippingProvider {
-		$umc = null === $gateway
-			? new UmcThresholdDisplay(
-				static function (): array {
-					return array(
-						'formatted_html' => 'x',
-						'amount'         => '0',
-						'currency_code'  => 'EUR',
-					);
-				}
-			)
-			: new UmcThresholdDisplay( $gateway );
-
-		return new WooCommerceFreeShippingProvider(
-			new EligibilityGate(),
-			$umc,
-			new Sanitizer()
-		);
 	}
 }

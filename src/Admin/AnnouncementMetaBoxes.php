@@ -1,6 +1,6 @@
 <?php
 /**
- * Announcement meta boxes.
+ * Announcement meta boxes and editor UX.
  *
  * @package UniversalSiteAnnouncements
  */
@@ -12,11 +12,13 @@ namespace USA\Admin;
 use USA\Announcement\PostType;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
+use USA\Lifecycle\Schema;
 use USA\Provider\WooCommerceFreeShippingProvider;
 use USA\Settings;
+use USA\Template\TemplateEngine;
 
 /**
- * Enabled / priority / schedule / source meta for announcements.
+ * Enabled / priority / schedule / source / template meta for announcements.
  */
 final class AnnouncementMetaBoxes {
 
@@ -44,20 +46,30 @@ final class AnnouncementMetaBoxes {
 	private ?WooCommerceFreeShippingProvider $provider;
 
 	/**
+	 * Template engine.
+	 *
+	 * @var TemplateEngine
+	 */
+	private TemplateEngine $engine;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Sanitizer                            $sanitizer Content sanitiser.
 	 * @param ScheduleEvaluator                    $schedule  Schedule helper.
 	 * @param WooCommerceFreeShippingProvider|null $provider  Provider for diagnostics.
+	 * @param TemplateEngine                       $engine    Template engine.
 	 */
 	public function __construct(
 		Sanitizer $sanitizer,
 		ScheduleEvaluator $schedule,
-		?WooCommerceFreeShippingProvider $provider = null
+		?WooCommerceFreeShippingProvider $provider,
+		TemplateEngine $engine
 	) {
 		$this->sanitizer = $sanitizer;
 		$this->schedule  = $schedule;
 		$this->provider  = $provider;
+		$this->engine    = $engine;
 	}
 
 	/**
@@ -65,10 +77,13 @@ final class AnnouncementMetaBoxes {
 	 */
 	public function register(): void {
 		add_action( 'add_meta_boxes', array( $this, 'add_boxes' ) );
+		add_action( 'edit_form_after_title', array( $this, 'render_source_selector' ) );
 		add_action( 'save_post_' . PostType::POST_TYPE, array( $this, 'save' ), 10, 2 );
 		add_filter( 'content_save_pre', array( $this, 'sanitize_content_on_save' ), 10, 1 );
 		add_action( 'admin_notices', array( $this, 'render_admin_errors' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_editor_script' ) );
+		add_action( 'admin_notices', array( $this, 'render_invalid_template_notice' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_editor_assets' ) );
+		add_action( 'wp_ajax_usa_search_products', array( $this, 'ajax_search_products' ) );
 	}
 
 	/**
@@ -84,6 +99,22 @@ final class AnnouncementMetaBoxes {
 			'high'
 		);
 		add_meta_box(
+			'usa_announcement_tokens',
+			__( 'Dynamic values', 'universal-site-announcements' ),
+			array( $this, 'render_tokens_box' ),
+			PostType::POST_TYPE,
+			'normal',
+			'high'
+		);
+		add_meta_box(
+			'usa_announcement_preview',
+			__( 'Template preview', 'universal-site-announcements' ),
+			array( $this, 'render_preview_box' ),
+			PostType::POST_TYPE,
+			'normal',
+			'default'
+		);
+		add_meta_box(
 			'usa_announcement_provider_diag',
 			__( 'Free shipping diagnostics', 'universal-site-announcements' ),
 			array( $this, 'render_diagnostics_box' ),
@@ -94,24 +125,55 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
-	 * Render settings meta box.
+	 * Prominent source selector above the content editor.
+	 *
+	 * @param \WP_Post $post Post.
+	 */
+	public function render_source_selector( $post ): void {
+		if ( ! $post instanceof \WP_Post || PostType::POST_TYPE !== $post->post_type ) {
+			return;
+		}
+
+		$source = (string) get_post_meta( $post->ID, '_usa_source', true );
+		if ( '' === $source ) {
+			$source = 'manual';
+		}
+
+		wp_nonce_field( 'usa_announcement_meta', 'usa_announcement_meta_nonce' );
+		?>
+		<div class="usa-source-selector notice notice-info inline" style="padding:12px 16px;margin:12px 0;">
+			<p style="margin:0 0 8px;font-weight:600;">
+				<?php echo esc_html__( 'Announcement source', 'universal-site-announcements' ); ?>
+			</p>
+			<p style="margin:0 0 8px;">
+				<label style="margin-right:16px;">
+					<input type="radio" name="usa_source" value="manual" <?php checked( $source, 'manual' ); ?> />
+					<?php echo esc_html__( 'Manual message', 'universal-site-announcements' ); ?>
+				</label>
+				<label>
+					<input type="radio" name="usa_source" value="<?php echo esc_attr( WooCommerceFreeShippingProvider::SOURCE ); ?>" <?php checked( $source, WooCommerceFreeShippingProvider::SOURCE ); ?> />
+					<?php echo esc_html__( 'WooCommerce free shipping', 'universal-site-announcements' ); ?>
+				</label>
+			</p>
+			<p class="description" style="margin:0;">
+				<?php echo esc_html__( 'Choose the source before editing the message. Dynamic values available in the editor depend on this selection.', 'universal-site-announcements' ); ?>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render settings meta box (enabled / priority / schedule).
 	 *
 	 * @param \WP_Post $post Post.
 	 */
 	public function render_box( $post ): void {
-		wp_nonce_field( 'usa_announcement_meta', 'usa_announcement_meta_nonce' );
-
 		$enabled  = get_post_meta( $post->ID, '_usa_enabled', true );
 		$priority = get_post_meta( $post->ID, '_usa_priority', true );
 		if ( '' === $priority ) {
 			$priority = '10';
 		}
 		$is_enabled = ( '' === $enabled ) ? true : ( '1' === (string) $enabled || 'yes' === (string) $enabled );
-
-		$source = (string) get_post_meta( $post->ID, '_usa_source', true );
-		if ( '' === $source ) {
-			$source = 'manual';
-		}
 
 		$tz           = $this->schedule->site_timezone_string();
 		$starts_utc   = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_STARTS_AT, true );
@@ -128,15 +190,6 @@ final class AnnouncementMetaBoxes {
 		<p>
 			<label for="usa_priority"><?php echo esc_html__( 'Priority (lower first)', 'universal-site-announcements' ); ?></label><br />
 			<input type="number" id="usa_priority" name="usa_priority" value="<?php echo esc_attr( (string) $priority ); ?>" class="small-text" required />
-		</p>
-		<p>
-			<label for="usa_source"><?php echo esc_html__( 'Source', 'universal-site-announcements' ); ?></label><br />
-			<select id="usa_source" name="usa_source">
-				<option value="manual" <?php selected( $source, 'manual' ); ?>><?php echo esc_html__( 'Manual', 'universal-site-announcements' ); ?></option>
-				<option value="<?php echo esc_attr( WooCommerceFreeShippingProvider::SOURCE ); ?>" <?php selected( $source, WooCommerceFreeShippingProvider::SOURCE ); ?>>
-					<?php echo esc_html__( 'WooCommerce free shipping', 'universal-site-announcements' ); ?>
-				</option>
-			</select>
 		</p>
 		<p>
 			<label for="usa_starts_at"><?php echo esc_html__( 'Starts at', 'universal-site-announcements' ); ?></label><br />
@@ -157,10 +210,129 @@ final class AnnouncementMetaBoxes {
 			);
 			?>
 		</p>
-		<p class="description usa-provider-hint" <?php echo WooCommerceFreeShippingProvider::SOURCE === $source ? '' : 'hidden'; ?>>
-			<?php echo esc_html__( 'Provider announcements generate content at render time. The content editor is unused.', 'universal-site-announcements' ); ?>
+		<?php
+	}
+
+	/**
+	 * Insert dynamic value controls.
+	 *
+	 * @param \WP_Post $post Post.
+	 */
+	/**
+	 * Insert dynamic value controls.
+	 *
+	 * @param \WP_Post $post Post (unused; metabox signature).
+	 */
+	public function render_tokens_box( $post ): void {
+		unset( $post );
+		?>
+		<p class="description">
+			<?php echo esc_html__( 'Insert a dynamic value at the cursor in the content editor. Only values allowed for the selected source are shown.', 'universal-site-announcements' ); ?>
+		</p>
+		<p class="usa-token-buttons">
+			<button type="button" class="button usa-insert-token" data-token="{{free_shipping_threshold}}" data-requires-source="woocommerce_free_shipping">
+				<?php echo esc_html__( 'Free shipping threshold', 'universal-site-announcements' ); ?>
+			</button>
+			<button type="button" class="button usa-insert-product" id="usa-insert-product">
+				<?php echo esc_html__( 'Product link…', 'universal-site-announcements' ); ?>
+			</button>
+		</p>
+		<div id="usa-product-picker" hidden style="margin-top:8px;">
+			<label for="usa-product-search"><?php echo esc_html__( 'Search products', 'universal-site-announcements' ); ?></label>
+			<input type="search" id="usa-product-search" class="regular-text" autocomplete="off" />
+			<ul id="usa-product-results" style="margin:8px 0;max-height:180px;overflow:auto;"></ul>
+		</div>
+		<p class="description">
+			<code>{{free_shipping_threshold}}</code>
+			—
+			<?php echo esc_html__( 'Required exactly once for free-shipping source.', 'universal-site-announcements' ); ?>
+			<br />
+			<code>{{product:123}}</code>
+			—
+			<?php echo esc_html__( 'Public product title linked to its current URL.', 'universal-site-announcements' ); ?>
 		</p>
 		<?php
+	}
+
+	/**
+	 * Preview / status panel.
+	 *
+	 * @param \WP_Post $post Post.
+	 */
+	public function render_preview_box( $post ): void {
+		$source = (string) get_post_meta( $post->ID, '_usa_source', true );
+		if ( '' === $source ) {
+			$source = 'manual';
+		}
+		$template = (string) $post->post_content;
+
+		$inspect = $this->engine->inspect( $template, $source );
+
+		echo '<p class="description">' . esc_html__(
+			'Promotional wording (for example “Buy 2… get one free”) is editorial. This plugin resolves product names and links only; it does not verify promotion configuration.',
+			'universal-site-announcements'
+		) . '</p>';
+
+		echo '<h4>' . esc_html__( 'Detected tokens', 'universal-site-announcements' ) . '</h4>';
+		if ( array() === $inspect['tokens'] ) {
+			echo '<p>' . esc_html__( 'None', 'universal-site-announcements' ) . '</p>';
+		} else {
+			echo '<ul>';
+			foreach ( $inspect['tokens'] as $token ) {
+				printf( '<li><code>%s</code></li>', esc_html( $token['raw'] ) );
+			}
+			echo '</ul>';
+		}
+
+		if ( ! $inspect['ok'] ) {
+			printf(
+				'<p><strong>%s</strong> %s</p>',
+				esc_html__( 'Invalid template:', 'universal-site-announcements' ),
+				esc_html( $this->humanize_reason( $inspect['reason'] ) )
+			);
+			return;
+		}
+
+		$context = array();
+		if ( WooCommerceFreeShippingProvider::SOURCE === $source && null !== $this->provider ) {
+			$base = $this->provider->resolve_base_threshold();
+			if ( null === $base ) {
+				printf(
+					'<p><strong>%s</strong> %s</p>',
+					esc_html__( 'Suppressed:', 'universal-site-announcements' ),
+					esc_html( $this->provider->last_suppression_reason() )
+				);
+				return;
+			}
+			$html = $this->provider->resolve_threshold_html( $base );
+			if ( null === $html ) {
+				printf(
+					'<p><strong>%s</strong> %s</p>',
+					esc_html__( 'Suppressed:', 'universal-site-announcements' ),
+					esc_html( $this->provider->last_suppression_reason() )
+				);
+				return;
+			}
+			$context = array(
+				'base_threshold' => $base,
+				'threshold_html' => $html,
+			);
+		}
+
+		$rendered = $this->engine->render( $template, $source, $context );
+		if ( null === $rendered ) {
+			printf(
+				'<p><strong>%s</strong> %s</p>',
+				esc_html__( 'Suppressed:', 'universal-site-announcements' ),
+				esc_html( $this->humanize_reason( $this->engine->last_reason() ) )
+			);
+			return;
+		}
+
+		echo '<h4>' . esc_html__( 'Rendered preview', 'universal-site-announcements' ) . '</h4>';
+		echo '<div class="usa-template-preview" style="padding:8px;border:1px solid #c3c4c7;background:#fff;">';
+		echo wp_kses( $rendered, $this->sanitizer->output_allowed_html() );
+		echo '</div>';
 	}
 
 	/**
@@ -180,16 +352,25 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$diag = $this->provider->diagnose();
+		$diag     = $this->provider->diagnose();
+		$inspect  = $this->engine->inspect( (string) $post->post_content, $source );
+		$template = '' !== trim( (string) $post->post_content )
+			? (string) $post->post_content
+			: Schema::DEFAULT_FREE_SHIPPING_TEMPLATE;
+
 		echo '<table class="widefat striped"><tbody>';
 		$rows = array(
 			__( 'Reference country', 'universal-site-announcements' ) => (string) ( $diag['reference_country'] ?? '' ),
 			__( 'Zone', 'universal-site-announcements' )   => (string) ( $diag['zone_name'] ?? '' ),
 			__( 'Method', 'universal-site-announcements' ) => (string) ( $diag['method_id'] ?? '' ),
 			__( 'Base min amount', 'universal-site-announcements' ) => (string) ( $diag['base_min_amount'] ?? '' ),
-			__( 'UMC API available', 'universal-site-announcements' ) => ! empty( $diag['umc_available'] ) ? __( 'Yes', 'universal-site-announcements' ) : __( 'No', 'universal-site-announcements' ),
+			__( 'UMC active', 'universal-site-announcements' ) => ! empty( $diag['umc_active'] ) ? __( 'Yes', 'universal-site-announcements' ) : __( 'No', 'universal-site-announcements' ),
+			__( 'UMC API available', 'universal-site-announcements' ) => ! empty( $diag['umc_api_available'] ) ? __( 'Yes', 'universal-site-announcements' ) : __( 'No', 'universal-site-announcements' ),
 			__( 'Eligibility OK', 'universal-site-announcements' ) => ! empty( $diag['eligibility_ok'] ) ? __( 'Yes', 'universal-site-announcements' ) : __( 'No', 'universal-site-announcements' ),
+			__( 'Template valid', 'universal-site-announcements' ) => $inspect['ok'] ? __( 'Yes', 'universal-site-announcements' ) : __( 'No', 'universal-site-announcements' ),
+			__( 'Template issue', 'universal-site-announcements' ) => $inspect['ok'] ? '' : $this->humanize_reason( $inspect['reason'] ),
 			__( 'Last suppression', 'universal-site-announcements' ) => (string) ( $diag['suppression_reason'] ?? '' ),
+			__( 'Default seed template', 'universal-site-announcements' ) => ( Schema::DEFAULT_FREE_SHIPPING_TEMPLATE === $template ) ? __( 'Matches migration default', 'universal-site-announcements' ) : __( 'Custom', 'universal-site-announcements' ),
 		);
 		foreach ( $rows as $label => $value ) {
 			printf(
@@ -235,8 +416,23 @@ final class AnnouncementMetaBoxes {
 				$this->queue_error(
 					__( 'Only one enabled WooCommerce free shipping announcement is allowed.', 'universal-site-announcements' )
 				);
-				// Keep previous source/enabled rather than creating a second enabled provider.
 				return;
+			}
+		}
+
+		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( is_string( $content ) ) {
+			$content = $this->sanitizer->sanitize( $content );
+			$inspect = $this->engine->inspect( $content, $source );
+			if ( ! $inspect['ok'] ) {
+				$this->queue_error(
+					sprintf(
+						/* translators: %s: validation reason */
+						__( 'Invalid announcement template: %s', 'universal-site-announcements' ),
+						$this->humanize_reason( $inspect['reason'] )
+					)
+				);
+				// Still persist source/settings; front-end will suppress until fixed.
 			}
 		}
 
@@ -282,7 +478,7 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
-	 * Sanitize post content for announcement CPT only (manual source).
+	 * Sanitize post content for announcement CPT (both sources keep merge tags).
 	 *
 	 * @param string $content Content.
 	 */
@@ -297,11 +493,6 @@ final class AnnouncementMetaBoxes {
 		}
 
 		if ( PostType::POST_TYPE !== $post_type ) {
-			return $content;
-		}
-
-		$source = isset( $_POST['usa_source'] ) ? sanitize_key( wp_unslash( $_POST['usa_source'] ) ) : 'manual'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		if ( WooCommerceFreeShippingProvider::SOURCE === $source ) {
 			return $content;
 		}
 
@@ -331,11 +522,60 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
-	 * Hide the content editor when provider source is selected.
+	 * Notice when editing an invalid legacy free-shipping template.
+	 */
+	public function render_invalid_template_notice(): void {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || PostType::POST_TYPE !== $screen->post_type || 'post' !== $screen->base ) {
+			return;
+		}
+		if ( ! current_user_can( Settings::manage_cap() ) ) {
+			return;
+		}
+
+		$post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( $post_id < 1 ) {
+			return;
+		}
+
+		$source = (string) get_post_meta( $post_id, '_usa_source', true );
+		if ( WooCommerceFreeShippingProvider::SOURCE !== $source ) {
+			return;
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return;
+		}
+
+		$content = (string) $post->post_content;
+		if ( '' === trim( $content ) ) {
+			return;
+		}
+
+		$inspect = $this->engine->inspect( $content, $source );
+		if ( $inspect['ok'] ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-error"><p>%s</p></div>',
+			esc_html(
+				sprintf(
+					/* translators: %s: reason */
+					__( 'This free-shipping announcement has an invalid template and will be suppressed on the front end until corrected: %s', 'universal-site-announcements' ),
+					$this->humanize_reason( $inspect['reason'] )
+				)
+			)
+		);
+	}
+
+	/**
+	 * Enqueue editor script + styles.
 	 *
 	 * @param string $hook Admin page hook.
 	 */
-	public function enqueue_editor_script( string $hook ): void {
+	public function enqueue_editor_assets( string $hook ): void {
 		if ( ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 			return;
 		}
@@ -344,26 +584,68 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$script = <<<'JS'
-document.addEventListener('DOMContentLoaded', function () {
-	var source = document.getElementById('usa_source');
-	if (!source) { return; }
-	var editor = document.getElementById('postdivrich') || document.getElementById('postdiv');
-	var hint = document.querySelector('.usa-provider-hint');
-	var diag = document.getElementById('usa_announcement_provider_diag');
-	function sync() {
-		var isProvider = source.value === 'woocommerce_free_shipping';
-		if (editor) { editor.style.display = isProvider ? 'none' : ''; }
-		if (hint) { hint.hidden = !isProvider; }
-		if (diag) { diag.style.display = isProvider ? '' : 'none'; }
+		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.3.0';
+		$js      = USA_PLUGIN_DIR . 'assets/js/announcement-editor.js';
+		$url     = plugins_url( 'assets/js/announcement-editor.js', USA_PLUGIN_FILE );
+
+		wp_enqueue_script(
+			'usa-announcement-editor',
+			$url,
+			array(),
+			is_readable( $js ) ? (string) filemtime( $js ) : $version,
+			true
+		);
+
+		wp_localize_script(
+			'usa-announcement-editor',
+			'usaAnnouncementEditor',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'usa_search_products' ),
+				'i18n'    => array(
+					'noResults' => __( 'No products found.', 'universal-site-announcements' ),
+					'searching' => __( 'Searching…', 'universal-site-announcements' ),
+				),
+			)
+		);
 	}
-	source.addEventListener('change', sync);
-	sync();
-});
-JS;
-		wp_register_script( 'usa-announcement-admin', false, array(), defined( 'USA_VERSION' ) ? USA_VERSION : '0.2.0', true );
-		wp_enqueue_script( 'usa-announcement-admin' );
-		wp_add_inline_script( 'usa-announcement-admin', $script );
+
+	/**
+	 * AJAX product search for the insert picker.
+	 */
+	public function ajax_search_products(): void {
+		if ( ! current_user_can( Settings::manage_cap() ) ) {
+			wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+		}
+
+		check_ajax_referer( 'usa_search_products', 'nonce' );
+
+		$term = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		if ( '' === $term || ! function_exists( 'wc_get_products' ) ) {
+			wp_send_json_success( array( 'products' => array() ) );
+		}
+
+		$products = wc_get_products(
+			array(
+				'status' => 'publish',
+				'limit'  => 20,
+				's'      => $term,
+				'return' => 'objects',
+			)
+		);
+
+		$out = array();
+		foreach ( $products as $product ) {
+			if ( ! is_object( $product ) || ! method_exists( $product, 'get_id' ) ) {
+				continue;
+			}
+			$out[] = array(
+				'id'    => (int) $product->get_id(),
+				'title' => method_exists( $product, 'get_name' ) ? (string) $product->get_name() : '',
+			);
+		}
+
+		wp_send_json_success( array( 'products' => $out ) );
 	}
 
 	/**
@@ -408,5 +690,26 @@ JS;
 		}
 		$errors[] = $message;
 		set_transient( self::ERROR_TRANSIENT, $errors, 300 );
+	}
+
+	/**
+	 * Human-readable reason for admin UI.
+	 *
+	 * @param string $reason Machine reason.
+	 */
+	private function humanize_reason( string $reason ): string {
+		$map = array(
+			'malformed_merge_tags'          => __( 'Malformed merge tags (unmatched or invalid {{…}}).', 'universal-site-announcements' ),
+			'token_in_attribute'            => __( 'Merge tags are not allowed inside HTML attributes.', 'universal-site-announcements' ),
+			'product_token_inside_anchor'   => __( 'Product tokens cannot appear inside an existing link.', 'universal-site-announcements' ),
+			'token_not_in_text_node'        => __( 'Merge tags must appear in text content.', 'universal-site-announcements' ),
+			'free_shipping_token_forbidden' => __( 'Free-shipping threshold tokens are not allowed on manual announcements.', 'universal-site-announcements' ),
+			'free_shipping_token_count'     => __( 'Free-shipping announcements require exactly one {{free_shipping_threshold}} token.', 'universal-site-announcements' ),
+			'unknown_token'                 => __( 'Unknown merge tag.', 'universal-site-announcements' ),
+			'invalid_product_token'         => __( 'Invalid product token (use a positive numeric ID).', 'universal-site-announcements' ),
+			'invalid_token_argument'        => __( 'Invalid token argument.', 'universal-site-announcements' ),
+		);
+
+		return $map[ $reason ] ?? $reason;
 	}
 }
