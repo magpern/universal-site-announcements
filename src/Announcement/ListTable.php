@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace USA\Announcement;
 
-use USA\Provider\WooCommerceFreeShippingProvider;
 use USA\Settings;
+use USA\Template\TemplateRequirements;
 
 /**
  * Priority and schedule columns on the announcements list table.
@@ -25,12 +25,21 @@ final class ListTable {
 	private ScheduleEvaluator $schedule;
 
 	/**
+	 * Template requirements analyser.
+	 *
+	 * @var TemplateRequirements
+	 */
+	private TemplateRequirements $requirements;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param ScheduleEvaluator $schedule Schedule helper.
+	 * @param ScheduleEvaluator    $schedule     Schedule helper.
+	 * @param TemplateRequirements $requirements Requirements analyser.
 	 */
-	public function __construct( ScheduleEvaluator $schedule ) {
-		$this->schedule = $schedule;
+	public function __construct( ScheduleEvaluator $schedule, TemplateRequirements $requirements ) {
+		$this->schedule     = $schedule;
+		$this->requirements = $requirements;
 	}
 
 	/**
@@ -100,8 +109,12 @@ final class ListTable {
 				break;
 
 			case 'usa_source':
-				$source = (string) get_post_meta( $post_id, '_usa_source', true );
-				if ( WooCommerceFreeShippingProvider::SOURCE === $source ) {
+				$post     = get_post( $post_id );
+				$body     = $post ? (string) $post->post_content : '';
+				$analysis = $this->requirements->analyse( $body );
+				if ( ! $analysis['ok'] ) {
+					echo esc_html__( 'Invalid template', 'universal-site-announcements' );
+				} elseif ( $analysis['requires_free_shipping'] ) {
 					echo esc_html__( 'Free shipping', 'universal-site-announcements' );
 				} else {
 					echo esc_html__( 'Manual', 'universal-site-announcements' );

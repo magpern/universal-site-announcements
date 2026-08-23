@@ -19,6 +19,7 @@ use USA\Template\MergeTagParser;
 use USA\Template\ProductToken;
 use USA\Template\SourceTokenRules;
 use USA\Template\TemplateEngine;
+use USA\Template\TemplateRequirements;
 
 /**
  * End-to-end template rendering behaviours.
@@ -32,6 +33,71 @@ final class TemplateEngineTest extends TestCase {
 		$engine = $this->engine();
 		$out    = $engine->render( 'Hello <strong>world</strong>', 'manual' );
 		$this->assertSame( 'Hello <strong>world</strong>', $out );
+	}
+
+	/**
+	 * Product-only template derives as manual (source arg ignored).
+	 */
+	public function test_product_only_derives_manual(): void {
+		$engine = $this->engine_with_product(
+			static function ( int $id ): ?array {
+				return array(
+					'title' => 'P' . $id,
+					'url'   => 'https://example.test/' . $id,
+				);
+			}
+		);
+		$inspect = $engine->inspect( 'See {{product:7}}' );
+		$this->assertTrue( $inspect['ok'] );
+		$this->assertFalse( $inspect['requires_free_shipping'] );
+		$this->assertSame( 'manual', $inspect['derived_source'] );
+		$this->assertNotNull( $engine->render( 'See {{product:7}}', 'woocommerce_free_shipping' ) );
+	}
+
+	/**
+	 * Adding free-shipping token derives FS requirement regardless of stale source arg.
+	 */
+	public function test_threshold_token_derives_free_shipping(): void {
+		$engine  = $this->engine();
+		$inspect = $engine->inspect( 'Over {{free_shipping_threshold}}' );
+		$this->assertTrue( $inspect['ok'] );
+		$this->assertTrue( $inspect['requires_free_shipping'] );
+		$this->assertSame( 'woocommerce_free_shipping', $inspect['derived_source'] );
+
+		$amount = '<span class="amount">10</span>';
+		$out    = $engine->render(
+			'Over {{free_shipping_threshold}}',
+			'manual',
+			array(
+				'base_threshold' => '10.00',
+				'threshold_html' => $amount,
+			)
+		);
+		$this->assertNotNull( $out );
+		$this->assertStringContainsString( $amount, $out );
+	}
+
+	/**
+	 * Removing threshold returns to manual behaviour.
+	 */
+	public function test_removing_threshold_returns_to_manual(): void {
+		$engine = $this->engine();
+		$this->assertTrue( $engine->inspect( 'Ship {{free_shipping_threshold}}' )['requires_free_shipping'] );
+		$without = $engine->inspect( 'Ship today' );
+		$this->assertTrue( $without['ok'] );
+		$this->assertFalse( $without['requires_free_shipping'] );
+		$this->assertSame( 'manual', $without['derived_source'] );
+	}
+
+	/**
+	 * Invalid templates fail closed (not treated as manual).
+	 */
+	public function test_invalid_template_not_manual(): void {
+		$engine  = $this->engine();
+		$inspect = $engine->inspect( 'Bad {{product:1' );
+		$this->assertFalse( $inspect['ok'] );
+		$this->assertFalse( $inspect['requires_free_shipping'] );
+		$this->assertNull( $engine->render( 'Bad {{product:1', 'manual' ) );
 	}
 
 	/**
@@ -122,9 +188,11 @@ final class TemplateEngineTest extends TestCase {
 		$umc = new UmcThresholdDisplay();
 
 		return new TemplateEngine(
-			new MergeTagParser(),
-			new HtmlPlacementValidator(),
-			new SourceTokenRules(),
+			new TemplateRequirements(
+				new MergeTagParser(),
+				new HtmlPlacementValidator(),
+				new SourceTokenRules()
+			),
 			$sanitizer,
 			array(
 				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),
@@ -146,9 +214,11 @@ final class TemplateEngineTest extends TestCase {
 		$umc = new UmcThresholdDisplay();
 
 		return new TemplateEngine(
-			new MergeTagParser(),
-			new HtmlPlacementValidator(),
-			new SourceTokenRules(),
+			new TemplateRequirements(
+				new MergeTagParser(),
+				new HtmlPlacementValidator(),
+				new SourceTokenRules()
+			),
 			$sanitizer,
 			array(
 				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),

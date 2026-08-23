@@ -32,6 +32,7 @@ use USA\Template\MergeTagParser;
 use USA\Template\ProductToken;
 use USA\Template\SourceTokenRules;
 use USA\Template\TemplateEngine;
+use USA\Template\TemplateRequirements;
 
 /**
  * Main plugin controller.
@@ -70,10 +71,13 @@ final class Plugin {
 		$activity  = new UmcActivity();
 		$provider  = new WooCommerceFreeShippingProvider( $gate, $umc, $sanitizer, $activity );
 
-		$engine = new TemplateEngine(
+		$requirements = new TemplateRequirements(
 			new MergeTagParser(),
 			new HtmlPlacementValidator(),
-			new SourceTokenRules(),
+			new SourceTokenRules()
+		);
+		$engine       = new TemplateEngine(
+			$requirements,
 			$sanitizer,
 			array(
 				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),
@@ -89,7 +93,7 @@ final class Plugin {
 		( new SettingsPage() )->register();
 		( new PluginActionLinks() )->register();
 		( new AnnouncementMetaBoxes( $sanitizer, $schedule, $provider, $engine ) )->register();
-		( new ListTable( $schedule ) )->register();
+		( new ListTable( $schedule, $requirements ) )->register();
 		( new DiagnosticsNotice() )->register();
 		( new StoreNoticeRenderer( $selector, $sanitizer, $replacer ) )->register();
 	}

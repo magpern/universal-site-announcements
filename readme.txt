@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -11,7 +11,7 @@ Generic site-wide announcement bar with safe inline links for WordPress.
 
 == Description ==
 
-Universal Site Announcements manages site-wide announcement messages and can integrate with the WooCommerce Store Notice rendering seam. Milestone 4 adds schedule modes (always, one-time interval, weekly recurring with optional date window). Milestone 3 adds editable message templates with merge tags ({{free_shipping_threshold}}, {{product:ID}}), HTML-aware placement validation, and hybrid Universal Multicurrency threshold display.
+Universal Site Announcements manages site-wide announcement messages and can integrate with the WooCommerce Store Notice rendering seam. Dynamic requirements (including free shipping) are derived from the message template. Milestone 4 adds schedule modes (always, one-time interval, weekly recurring with optional date window).
 
 Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plugin row links: Announcements, Settings, Deactivate.
 
@@ -23,6 +23,10 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.4.1 =
+* Derive free-shipping vs manual requirements from the template; remove source radio.
+* Read-only Dynamic requirements status in the editor.
 
 = 0.4.0 =
 * Schedule modes: always, one-time date interval, weekly recurring (site timezone).

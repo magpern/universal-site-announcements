@@ -17,25 +17,11 @@ use USA\Announcement\Sanitizer;
 final class TemplateEngine {
 
 	/**
-	 * Parser.
+	 * Requirements analyser (same grammar as render).
 	 *
-	 * @var MergeTagParser
+	 * @var TemplateRequirements
 	 */
-	private MergeTagParser $parser;
-
-	/**
-	 * HTML placement validator.
-	 *
-	 * @var HtmlPlacementValidator
-	 */
-	private HtmlPlacementValidator $placement;
-
-	/**
-	 * Source token rules.
-	 *
-	 * @var SourceTokenRules
-	 */
-	private SourceTokenRules $rules;
+	private TemplateRequirements $requirements;
 
 	/**
 	 * Content sanitiser.
@@ -68,59 +54,52 @@ final class TemplateEngine {
 	/**
 	 * Constructor.
 	 *
-	 * @param MergeTagParser         $parser    Parser.
-	 * @param HtmlPlacementValidator $placement Placement validator.
-	 * @param SourceTokenRules       $rules     Source rules.
-	 * @param Sanitizer              $sanitizer Sanitiser.
-	 * @param TokenProvider[]        $providers Token providers.
+	 * @param TemplateRequirements $requirements Requirements analyser.
+	 * @param Sanitizer            $sanitizer    Sanitiser.
+	 * @param TokenProvider[]      $providers    Token providers.
 	 */
 	public function __construct(
-		MergeTagParser $parser,
-		HtmlPlacementValidator $placement,
-		SourceTokenRules $rules,
+		TemplateRequirements $requirements,
 		Sanitizer $sanitizer,
 		array $providers
 	) {
-		$this->parser    = $parser;
-		$this->placement = $placement;
-		$this->rules     = $rules;
-		$this->sanitizer = $sanitizer;
-		$this->providers = $providers;
+		$this->requirements = $requirements;
+		$this->sanitizer    = $sanitizer;
+		$this->providers    = $providers;
 	}
 
 	/**
-	 * Render a template for a source, or null on any failure.
+	 * Requirements analyser accessor.
+	 */
+	public function requirements(): TemplateRequirements {
+		return $this->requirements;
+	}
+
+	/**
+	 * Render a template, deriving requirements from content (source arg is ignored if passed for BC).
 	 *
 	 * @param string               $template Raw template.
-	 * @param string               $source   Announcement source.
+	 * @param string               $source   Ignored; derived from template. Kept for call-site BC.
 	 * @param array<string, mixed> $context  Token context.
 	 */
-	public function render( string $template, string $source, array $context = array() ): ?string {
+	public function render( string $template, string $source = '', array $context = array() ): ?string {
+		unset( $source );
+
 		$this->last_reason     = '';
 		$this->last_diagnostic = array(
 			'tokens'             => array(),
 			'suppression_reason' => '',
-			'source'             => $source,
+			'source'             => '',
 		);
 
-		$parsed = $this->parser->parse( $template );
-		if ( ! $parsed['ok'] ) {
-			return $this->fail( (string) $parsed['reason'] );
+		$analysis                        = $this->requirements->analyse( $template );
+		$this->last_diagnostic['source'] = $analysis['derived_source'];
+
+		if ( ! $analysis['ok'] ) {
+			return $this->fail( (string) $analysis['reason'] );
 		}
 
-		// Parsed merge tokens from a successful parse().
-		$tokens = $parsed['tokens'];
-
-		$rule_error = $this->rules->validate( $source, $tokens );
-		if ( null !== $rule_error ) {
-			return $this->fail( $rule_error );
-		}
-
-		$placement_error = $this->placement->validate( $template, $tokens );
-		if ( null !== $placement_error ) {
-			return $this->fail( $placement_error );
-		}
-
+		$tokens       = $analysis['tokens'];
 		$token_diag   = array();
 		$replacements = array();
 
@@ -145,16 +124,14 @@ final class TemplateEngine {
 				return $this->fail( 'token_unresolved:' . $token->name );
 			}
 
-			$token_diag[] = array(
+			$token_diag[]         = array(
 				'raw'    => $token->raw,
 				'status' => 'ok',
 			);
-			// Unique placeholder so duplicate product IDs each get a replacement pass.
 			$key                  = "\x00USA_TOK_{$index}\x00";
 			$replacements[ $key ] = $resolved;
 			$template             = substr_replace( $template, $key, $token->offset, strlen( $token->raw ) );
-			// Adjust subsequent offsets after this replacement length change.
-			$delta = strlen( $key ) - strlen( $token->raw );
+			$delta                = strlen( $key ) - strlen( $token->raw );
 			for ( $j = $index + 1, $n = count( $tokens ); $j < $n; $j++ ) {
 				if ( $tokens[ $j ]->offset > $token->offset ) {
 					$tokens[ $j ] = new MergeToken(
@@ -185,52 +162,24 @@ final class TemplateEngine {
 	 * Inspect a template without resolving (admin preview helpers).
 	 *
 	 * @param string $template Template.
-	 * @param string $source   Source.
-	 * @return array{ok:bool,reason:string,tokens:list<array{raw:string,name:string,arg:?string}>}
+	 * @param string $source   Ignored; kept for call-site BC.
+	 * @return array{
+	 *   ok:bool,
+	 *   reason:string,
+	 *   tokens:list<array{raw:string,name:string,arg:?string}>,
+	 *   requires_free_shipping:bool,
+	 *   derived_source:string
+	 * }
 	 */
-	public function inspect( string $template, string $source ): array {
-		$parsed = $this->parser->parse( $template );
-		if ( ! $parsed['ok'] ) {
-			return array(
-				'ok'     => false,
-				'reason' => (string) $parsed['reason'],
-				'tokens' => array(),
-			);
-		}
-
-		// Parsed merge tokens from a successful parse().
-		$tokens = $parsed['tokens'];
-		$list   = array();
-		foreach ( $tokens as $token ) {
-			$list[] = array(
-				'raw'  => $token->raw,
-				'name' => $token->name,
-				'arg'  => $token->arg,
-			);
-		}
-
-		$rule_error = $this->rules->validate( $source, $tokens );
-		if ( null !== $rule_error ) {
-			return array(
-				'ok'     => false,
-				'reason' => $rule_error,
-				'tokens' => $list,
-			);
-		}
-
-		$placement_error = $this->placement->validate( $template, $tokens );
-		if ( null !== $placement_error ) {
-			return array(
-				'ok'     => false,
-				'reason' => $placement_error,
-				'tokens' => $list,
-			);
-		}
-
+	public function inspect( string $template, string $source = '' ): array {
+		unset( $source );
+		$analysis = $this->requirements->analyse( $template );
 		return array(
-			'ok'     => true,
-			'reason' => '',
-			'tokens' => $list,
+			'ok'                     => $analysis['ok'],
+			'reason'                 => $analysis['reason'],
+			'tokens'                 => $analysis['token_list'],
+			'requires_free_shipping' => $analysis['requires_free_shipping'],
+			'derived_source'         => $analysis['derived_source'],
 		);
 	}
 

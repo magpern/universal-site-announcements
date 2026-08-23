@@ -1,5 +1,5 @@
 /**
- * Announcement editor: insert merge tags and product picker.
+ * Announcement editor: insert merge tags, product picker, requirements hint.
  */
 (function () {
 	'use strict';
@@ -11,11 +11,21 @@
 		return null;
 	}
 
+	function getContent() {
+		var editor = getEditor();
+		if (editor && !editor.isHidden()) {
+			return editor.getContent({ format: 'raw' }) || '';
+		}
+		var textarea = document.getElementById('content');
+		return textarea ? textarea.value : '';
+	}
+
 	function insertAtCursor(text) {
 		var editor = getEditor();
 		if (editor && !editor.isHidden()) {
 			editor.focus();
 			editor.execCommand('mceInsertContent', false, text);
+			refreshRequirements();
 			return;
 		}
 		var textarea = document.getElementById('content');
@@ -30,19 +40,47 @@
 		var pos = start + text.length;
 		textarea.setSelectionRange(pos, pos);
 		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		refreshRequirements();
 	}
 
-	function syncTokenButtons() {
-		var sourceInput = document.querySelector('input[name="usa_source"]:checked');
-		var source = sourceInput ? sourceInput.value : 'manual';
-		var isFs = source === 'woocommerce_free_shipping';
-		document.querySelectorAll('.usa-insert-token').forEach(function (btn) {
-			var required = btn.getAttribute('data-requires-source');
-			btn.hidden = !!(required && required !== source);
-		});
+	function refreshRequirements() {
+		var statusEl = document.getElementById('usa-dynamic-requirements-status');
+		var box = document.getElementById('usa-dynamic-requirements');
 		var diag = document.getElementById('usa_announcement_provider_diag');
+		if (!statusEl || !window.usaAnnouncementEditor || !usaAnnouncementEditor.i18n) {
+			return;
+		}
+		var content = getContent();
+		var hasFs = content.indexOf('{{free_shipping_threshold}}') !== -1;
+		var open = (content.match(/\{\{/g) || []).length;
+		var close = (content.match(/\}\}/g) || []).length;
+		var malformed = open !== close;
+		var i18n = usaAnnouncementEditor.i18n;
+		var label;
+		var css = 'notice-info';
+		var state = 'none';
+
+		if (malformed) {
+			label = i18n.reqInvalid || 'Template is invalid';
+			css = 'notice-error';
+			state = 'invalid';
+		} else if (hasFs) {
+			label = i18n.reqShipping || 'Requires WooCommerce free shipping';
+			css = 'notice-warning';
+			state = 'free_shipping';
+		} else {
+			label = i18n.reqNone || 'No special requirements';
+			css = 'notice-info';
+			state = 'none';
+		}
+
+		statusEl.textContent = label;
+		statusEl.setAttribute('data-status', state);
+		if (box) {
+			box.className = 'usa-dynamic-requirements notice ' + css + ' inline';
+		}
 		if (diag) {
-			diag.style.display = isFs ? '' : 'none';
+			diag.style.display = state === 'none' ? 'none' : '';
 		}
 	}
 
@@ -94,11 +132,6 @@
 	}
 
 	document.addEventListener('DOMContentLoaded', function () {
-		document.querySelectorAll('input[name="usa_source"]').forEach(function (el) {
-			el.addEventListener('change', syncTokenButtons);
-		});
-		syncTokenButtons();
-
 		function syncSchedulePanels() {
 			var modeInput = document.querySelector('input[name="usa_schedule_mode"]:checked');
 			var mode = modeInput ? modeInput.value : 'always';
@@ -145,5 +178,18 @@
 				}, 250);
 			});
 		}
+
+		var textarea = document.getElementById('content');
+		if (textarea) {
+			textarea.addEventListener('input', refreshRequirements);
+		}
+		if (window.tinymce) {
+			tinymce.on('AddEditor', function (e) {
+				if (e.editor && e.editor.id === 'content') {
+					e.editor.on('change keyup SetContent', refreshRequirements);
+				}
+			});
+		}
+		refreshRequirements();
 	});
 })();

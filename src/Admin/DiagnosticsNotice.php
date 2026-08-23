@@ -72,6 +72,13 @@ final class DiagnosticsNotice {
 	 * @param string $code Failure code.
 	 */
 	private function message_for_code( string $code ): string {
+		if ( 0 === strpos( $code, 'duplicate_free_shipping' ) ) {
+			return __(
+				'Universal Site Announcements suppressed free-shipping announcements because more than one enabled free-shipping-dependent message was active. Keep only one announcement that uses {{free_shipping_threshold}}.',
+				'universal-site-announcements'
+			);
+		}
+
 		if ( 0 === strpos( $code, 'schedule_' ) ) {
 			return __(
 				'Universal Site Announcements suppressed one or more announcements due to an invalid schedule configuration. Check the announcement schedule mode, weekdays, and weekly date window.',

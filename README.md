@@ -5,11 +5,11 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Text domain / slug:** `universal-site-announcements`  
 **PHP namespace:** `USA\`  
-**Version:** 0.4.0
+**Version:** 0.4.1
 
 ## Status
 
-**M1**–**M4** are implemented. See plans and closure docs under `docs/`.
+**M1**–**M4** are implemented. **0.4.1** corrects announcement editor UX: dynamic requirements are derived from the template (no source radio).
 
 **0.4.0** adds schedule modes (always / one-time interval / weekly recurring) with optional weekly date windows in the WordPress site timezone.
 
@@ -46,7 +46,7 @@ Announcement `post_content` is a template with optional merge tags:
 
 ### Announcement editor
 
-Source selector (manual / WooCommerce free shipping) above the content editor, dynamic-value insert (threshold / product picker), template preview, enabled, priority, **schedule mode** (Always active / One-time date interval / Weekly recurring), optional weekly weekdays and Weekly starts on / Weekly ends after, provider diagnostics.
+Source is **derived automatically** from the message template (read-only Dynamic requirements status). Insert free-shipping threshold or product links via Dynamic values — no source radio. Template preview, enabled, priority, **schedule mode** (Always active / One-time date interval / Weekly recurring), optional weekly weekdays and Weekly starts on / Weekly ends after, provider diagnostics when free shipping is required or the template is invalid.
 
 ### Settings
 
