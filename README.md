@@ -1,17 +1,17 @@
 # Universal Site Announcements
 
-Generic WordPress plugin for a site-wide announcement bar: manual messages, safe inline links, scheduling, accessible rotation, and optional dynamic message providers.
+Generic WordPress plugin for a site-wide announcement bar: manual messages, safe inline links, scheduling, accessible rotation, and optional dynamic message providers with merge-tag templates.
 
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Text domain / slug:** `universal-site-announcements`  
 **PHP namespace:** `USA\`  
-**Version:** 0.2.1
+**Version:** 0.3.0
 
 ## Status
 
-**M1** and **M2** are implemented. See plans and closure docs under `docs/`.
+**M1**, **M2**, and **M3** are implemented. See plans and closure docs under `docs/`.
 
-**0.2.1** corrects admin discoverability: top-level **Announcements** menu, Plugins-screen action links, and configurable rotation settings.
+**0.3.0** adds dynamic message templates (merge tags), HTML-aware placement validation, product link tokens, and hybrid Universal Multicurrency threshold display.
 
 ## Requirements
 
@@ -19,7 +19,21 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 - PHP 8.1+
 - Composer dependencies (`composer install`)
 - For Store Notice integration: WooCommerce with **Store notice enabled** (WooCommerce → Settings → Site visibility). This plugin does **not** toggle that option.
-- Free-shipping provider: Universal Multicurrency ≥ 1.2.0 (`umc_get_free_shipping_threshold_display`)
+- Free-shipping threshold display: Universal Multicurrency when active (≥ API with `umc_get_free_shipping_threshold_display`); if UMC is **not** active, base-currency `wc_price()` is used. If UMC is active but the API is missing or fails, the announcement is suppressed (no guessed amounts).
+
+## Message templates (M3)
+
+Announcement `post_content` is a template with optional merge tags:
+
+| Token | Allowed on | Output |
+|-------|------------|--------|
+| `{{free_shipping_threshold}}` | WooCommerce free shipping only (exactly one required) | Formatted threshold HTML |
+| `{{product:ID}}` | Manual and free shipping | Public product title → permalink link |
+
+- Tokens may appear only in text content (including inside `<strong>` / `<em>`).
+- Tokens in HTML attributes, or `{{product:…}}` inside an existing `<a>`, are rejected and the announcement is suppressed.
+- Malformed `{{…}}` braces suppress the announcement (no literal-brace escape language).
+- Migration: empty free-shipping bodies are seeded with `Free shipping on orders of {{free_shipping_threshold}} or more` once (`usa_schema_version` = 3). Non-empty bodies are never overwritten.
 
 ## Admin navigation
 
@@ -30,7 +44,7 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 
 ### Announcement editor
 
-Title, enabled, source (manual / WooCommerce free shipping), content (manual), priority, Starts at, Ends at (exclusive), provider diagnostics.
+Source selector (manual / WooCommerce free shipping) above the content editor, dynamic-value insert (threshold / product picker), template preview, enabled, priority, Starts at, Ends at (exclusive), provider diagnostics.
 
 ### Settings
 

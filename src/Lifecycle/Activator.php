@@ -28,6 +28,8 @@ final class Activator {
 		$post_type->register();
 		flush_rewrite_rules( false );
 
+		( new Schema() )->maybe_migrate();
+
 		$existing = get_posts(
 			array(
 				'post_type'      => PostType::POST_TYPE,

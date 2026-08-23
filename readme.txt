@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.2.1
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -11,7 +11,7 @@ Generic site-wide announcement bar with safe inline links for WordPress.
 
 == Description ==
 
-Universal Site Announcements manages site-wide announcement messages and can integrate with the WooCommerce Store Notice rendering seam. Milestone 2 adds scheduling, accessible multi-message rotation, and a WooCommerce free-shipping provider that displays currency-aware thresholds via Universal Multicurrency.
+Universal Site Announcements manages site-wide announcement messages and can integrate with the WooCommerce Store Notice rendering seam. Milestone 3 adds editable message templates with merge tags ({{free_shipping_threshold}}, {{product:ID}}), HTML-aware placement validation, and hybrid Universal Multicurrency threshold display (wc_price when UMC is inactive; suppress when UMC is active but the API is missing or fails).
 
 Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plugin row links: Announcements, Settings, Deactivate.
 
@@ -23,6 +23,12 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.3.0 =
+* Dynamic message templates with {{free_shipping_threshold}} and {{product:ID}} merge tags.
+* HTML-aware placement validation (no tokens in attributes; no product tokens inside existing links).
+* Hybrid UMC threshold display; empty free-shipping bodies migrated to the default template.
+* Editor: source selector above content, insert dynamic values, product search, template preview.
 
 = 0.2.1 =
 * Top-level Announcements menu (All Announcements, Add New, Settings).

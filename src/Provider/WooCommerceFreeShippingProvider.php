@@ -10,9 +10,13 @@ declare(strict_types=1);
 namespace USA\Provider;
 
 use USA\Announcement\Sanitizer;
+use USA\Lifecycle\Schema;
 
 /**
- * Builds a currency-aware free-shipping announcement via the UMC public API.
+ * Discovers free-shipping thresholds and formats them via hybrid UMC rules.
+ *
+ * Message authoring is template-based (M3); this class no longer sprintf-builds
+ * visitor copy as the sole path. {@see Schema::DEFAULT_FREE_SHIPPING_TEMPLATE}.
  */
 final class WooCommerceFreeShippingProvider {
 
@@ -31,6 +35,13 @@ final class WooCommerceFreeShippingProvider {
 	 * @var UmcThresholdDisplay
 	 */
 	private UmcThresholdDisplay $umc;
+
+	/**
+	 * UMC activity / hybrid display.
+	 *
+	 * @var UmcActivity
+	 */
+	private UmcActivity $activity;
 
 	/**
 	 * Content / price sanitiser.
@@ -59,28 +70,35 @@ final class WooCommerceFreeShippingProvider {
 	 * @param EligibilityGate     $gate      Eligibility allowlist gate.
 	 * @param UmcThresholdDisplay $umc       UMC API gateway.
 	 * @param Sanitizer           $sanitizer Sanitiser for price HTML.
+	 * @param UmcActivity|null    $activity  Optional hybrid activity detector.
 	 */
 	public function __construct(
 		EligibilityGate $gate,
 		UmcThresholdDisplay $umc,
-		Sanitizer $sanitizer
+		Sanitizer $sanitizer,
+		?UmcActivity $activity = null
 	) {
 		$this->gate      = $gate;
 		$this->umc       = $umc;
 		$this->sanitizer = $sanitizer;
+		$this->activity  = $activity ?? new UmcActivity();
 	}
 
 	/**
-	 * Resolve visitor-facing message HTML, or null when suppressed.
+	 * Discover the authoritative base min_amount, or null when suppressed.
+	 *
+	 * Runs eligibility, reference package, requires=min_amount matrix, uniqueness.
+	 * Does not format currency or build message HTML.
 	 */
-	public function resolve_message(): ?string {
+	public function resolve_base_threshold(): ?string {
 		$this->last_suppression_reason = '';
 		$this->last_diagnostic         = array(
 			'reference_country'  => '',
 			'zone_name'          => '',
 			'method_id'          => '',
 			'base_min_amount'    => '',
-			'umc_available'      => $this->umc->is_available(),
+			'umc_active'         => $this->activity->is_umc_active(),
+			'umc_api_available'  => $this->activity->is_api_available() || $this->umc->is_available(),
 			'suppression_reason' => '',
 			'eligibility_ok'     => false,
 		);
@@ -120,18 +138,41 @@ final class WooCommerceFreeShippingProvider {
 		}
 		$this->last_diagnostic['eligibility_ok'] = true;
 
-		if ( ! $this->umc->is_available() ) {
-			return $this->suppress( 'umc_api_unavailable' );
+		return $base_min;
+	}
+
+	/**
+	 * Hybrid-format a discovered base threshold to sanitised price HTML.
+	 *
+	 * @param string $base Base-currency threshold decimal string.
+	 */
+	public function resolve_threshold_html( string $base ): ?string {
+		$html = $this->activity->resolve_threshold_html( $base, $this->umc, $this->sanitizer );
+		if ( null === $html ) {
+			$reason                                      = $this->activity->failure_reason( $base, $this->umc );
+			$this->last_suppression_reason               = '' !== $reason ? $reason : 'threshold_html_unavailable';
+			$this->last_diagnostic['suppression_reason'] = $this->last_suppression_reason;
+			$this->last_diagnostic['umc_active']         = $this->activity->is_umc_active();
+			$this->last_diagnostic['umc_api_available']  = $this->umc->is_available();
+			return null;
 		}
 
-		$display = $this->umc->get( $base_min );
-		if ( null === $display ) {
-			return $this->suppress( 'umc_api_returned_null' );
-		}
-
-		$message                                     = $this->build_message( $display['formatted_html'] );
+		$this->last_suppression_reason               = '';
 		$this->last_diagnostic['suppression_reason'] = '';
-		return $message;
+		return $html;
+	}
+
+	/**
+	 * Legacy helper: discover + format (no template). Prefer template path.
+	 *
+	 * @return string|null Formatted threshold HTML only (not a full sentence).
+	 */
+	public function resolve_message(): ?string {
+		$base = $this->resolve_base_threshold();
+		if ( null === $base ) {
+			return null;
+		}
+		return $this->resolve_threshold_html( $base );
 	}
 
 	/**
@@ -140,7 +181,10 @@ final class WooCommerceFreeShippingProvider {
 	 * @return array<string, mixed>
 	 */
 	public function diagnose(): array {
-		$this->resolve_message();
+		$base = $this->resolve_base_threshold();
+		if ( null !== $base ) {
+			$this->resolve_threshold_html( $base );
+		}
 		return $this->last_diagnostic;
 	}
 
@@ -152,31 +196,17 @@ final class WooCommerceFreeShippingProvider {
 	}
 
 	/**
-	 * Build the announcement from formatted_html only (no money math).
-	 *
-	 * @param string $formatted_html UMC formatted_html (wc_price markup).
+	 * UMC activity helper (admin / diagnostics).
 	 */
-	public function build_message( string $formatted_html ): string {
-		$amount_html = $this->sanitizer->sanitize_price_html( $formatted_html );
+	public function activity(): UmcActivity {
+		return $this->activity;
+	}
 
-		/**
-		 * Filters the free-shipping announcement message template.
-		 *
-		 * Must contain a single %s placeholder for the amount HTML.
-		 *
-		 * @param string $template Message template.
-		 */
-		$template = (string) apply_filters(
-			'usa_free_shipping_message_template',
-			/* translators: %s: formatted free-shipping threshold HTML from UMC */
-			__( 'Free shipping on orders of %s or more', 'universal-site-announcements' )
-		);
-
-		if ( ! is_string( $template ) || '' === $template ) {
-			$template = 'Free shipping on orders of %s or more';
-		}
-
-		return sprintf( $template, $amount_html );
+	/**
+	 * Default migration seed template (not a runtime sprintf path).
+	 */
+	public static function default_template(): string {
+		return Schema::DEFAULT_FREE_SHIPPING_TEMPLATE;
 	}
 
 	/**
@@ -288,7 +318,6 @@ final class WooCommerceFreeShippingProvider {
 				continue;
 			}
 
-			// Canonical decimal string without inventing conversion.
 			$min_amount = $this->normalize_decimal_string( $min_raw );
 
 			$method_id = '';

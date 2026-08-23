@@ -19,11 +19,19 @@ use USA\Announcement\Repository;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
 use USA\Announcement\Selector;
+use USA\Lifecycle\Schema;
 use USA\Provider\EligibilityGate;
+use USA\Provider\UmcActivity;
 use USA\Provider\UmcThresholdDisplay;
 use USA\Provider\WooCommerceFreeShippingProvider;
 use USA\Rendering\ContentReplacer;
 use USA\Rendering\StoreNoticeRenderer;
+use USA\Template\FreeShippingThresholdToken;
+use USA\Template\HtmlPlacementValidator;
+use USA\Template\MergeTagParser;
+use USA\Template\ProductToken;
+use USA\Template\SourceTokenRules;
+use USA\Template\TemplateEngine;
 
 /**
  * Main plugin controller.
@@ -53,19 +61,34 @@ final class Plugin {
 	 * Registers hooks.
 	 */
 	public function init(): void {
-		$sanitizer  = new Sanitizer();
-		$schedule   = new ScheduleEvaluator();
-		$gate       = new EligibilityGate();
-		$umc        = new UmcThresholdDisplay();
-		$provider   = new WooCommerceFreeShippingProvider( $gate, $umc, $sanitizer );
-		$repository = new Repository( $sanitizer, $schedule, $provider );
+		( new Schema() )->register();
+
+		$sanitizer = new Sanitizer();
+		$schedule  = new ScheduleEvaluator();
+		$gate      = new EligibilityGate();
+		$umc       = new UmcThresholdDisplay();
+		$activity  = new UmcActivity();
+		$provider  = new WooCommerceFreeShippingProvider( $gate, $umc, $sanitizer, $activity );
+
+		$engine = new TemplateEngine(
+			new MergeTagParser(),
+			new HtmlPlacementValidator(),
+			new SourceTokenRules(),
+			$sanitizer,
+			array(
+				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),
+				new ProductToken(),
+			)
+		);
+
+		$repository = new Repository( $sanitizer, $schedule, $engine, $provider );
 		$selector   = new Selector( $repository );
 		$replacer   = new ContentReplacer();
 
 		( new PostType() )->register();
 		( new SettingsPage() )->register();
 		( new PluginActionLinks() )->register();
-		( new AnnouncementMetaBoxes( $sanitizer, $schedule, $provider ) )->register();
+		( new AnnouncementMetaBoxes( $sanitizer, $schedule, $provider, $engine ) )->register();
 		( new ListTable( $schedule ) )->register();
 		( new DiagnosticsNotice() )->register();
 		( new StoreNoticeRenderer( $selector, $sanitizer, $replacer ) )->register();
