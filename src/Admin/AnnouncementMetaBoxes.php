@@ -180,6 +180,23 @@ final class AnnouncementMetaBoxes {
 		$ends_utc     = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_ENDS_AT, true );
 		$starts_local = '' !== $starts_utc ? (string) $this->schedule->utc_to_site_local( $starts_utc, $tz ) : '';
 		$ends_local   = '' !== $ends_utc ? (string) $this->schedule->utc_to_site_local( $ends_utc, $tz ) : '';
+
+		$mode_raw = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_MODE, true );
+		$resolved = $this->schedule->resolve_mode( $mode_raw, $starts_utc, $ends_utc );
+		$mode     = ( $resolved['ok'] && null !== $resolved['mode'] ) ? $resolved['mode'] : ScheduleEvaluator::MODE_ALWAYS;
+		if ( '' === $mode_raw && $post->ID < 1 ) {
+			$mode = ScheduleEvaluator::MODE_ALWAYS;
+		}
+
+		$weekdays = $this->schedule->parse_weekdays_json(
+			(string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKDAYS, true )
+		);
+		if ( null === $weekdays ) {
+			$weekdays = array();
+		}
+		$weekly_starts = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKLY_STARTS_ON, true );
+		$weekly_ends   = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKLY_ENDS_ON, true );
+		$day_labels    = $this->schedule->weekday_full_labels();
 		?>
 		<p>
 			<label>
@@ -191,25 +208,88 @@ final class AnnouncementMetaBoxes {
 			<label for="usa_priority"><?php echo esc_html__( 'Priority (lower first)', 'universal-site-announcements' ); ?></label><br />
 			<input type="number" id="usa_priority" name="usa_priority" value="<?php echo esc_attr( (string) $priority ); ?>" class="small-text" required />
 		</p>
-		<p>
-			<label for="usa_starts_at"><?php echo esc_html__( 'Starts at', 'universal-site-announcements' ); ?></label><br />
-			<input type="datetime-local" id="usa_starts_at" name="usa_starts_at" value="<?php echo esc_attr( $starts_local ); ?>" />
-		</p>
-		<p>
-			<label for="usa_ends_at"><?php echo esc_html__( 'Ends at (exclusive)', 'universal-site-announcements' ); ?></label><br />
-			<input type="datetime-local" id="usa_ends_at" name="usa_ends_at" value="<?php echo esc_attr( $ends_local ); ?>" />
-		</p>
-		<p class="description">
-			<?php
-			echo esc_html(
-				sprintf(
-					/* translators: %s: site timezone */
-					__( 'Times use the site timezone (%s) and are stored as UTC. Leave empty for always-on. For a notice through 31 Dec, set Ends at to 1 Jan 00:00.', 'universal-site-announcements' ),
-					$tz
-				)
-			);
-			?>
-		</p>
+
+		<fieldset class="usa-schedule-mode" style="margin:12px 0;padding:8px 0;border-top:1px solid #dcdcde;">
+			<legend style="font-weight:600;padding:0;">
+				<?php echo esc_html__( 'Schedule mode', 'universal-site-announcements' ); ?>
+			</legend>
+			<p style="margin:8px 0;">
+				<label style="display:block;margin-bottom:4px;">
+					<input type="radio" name="usa_schedule_mode" value="<?php echo esc_attr( ScheduleEvaluator::MODE_ALWAYS ); ?>" <?php checked( $mode, ScheduleEvaluator::MODE_ALWAYS ); ?> />
+					<?php echo esc_html__( 'Always active', 'universal-site-announcements' ); ?>
+				</label>
+				<label style="display:block;margin-bottom:4px;">
+					<input type="radio" name="usa_schedule_mode" value="<?php echo esc_attr( ScheduleEvaluator::MODE_INTERVAL ); ?>" <?php checked( $mode, ScheduleEvaluator::MODE_INTERVAL ); ?> />
+					<?php echo esc_html__( 'One-time date interval', 'universal-site-announcements' ); ?>
+				</label>
+				<label style="display:block;">
+					<input type="radio" name="usa_schedule_mode" value="<?php echo esc_attr( ScheduleEvaluator::MODE_WEEKLY ); ?>" <?php checked( $mode, ScheduleEvaluator::MODE_WEEKLY ); ?> />
+					<?php echo esc_html__( 'Weekly recurring', 'universal-site-announcements' ); ?>
+				</label>
+			</p>
+		</fieldset>
+
+		<div class="usa-schedule-panel usa-schedule-always" data-usa-mode="<?php echo esc_attr( ScheduleEvaluator::MODE_ALWAYS ); ?>" <?php echo ScheduleEvaluator::MODE_ALWAYS === $mode ? '' : 'hidden'; ?>>
+			<p class="description">
+				<?php echo esc_html__( 'No date or weekday restrictions. Enable, priority, and source rules still apply.', 'universal-site-announcements' ); ?>
+			</p>
+		</div>
+
+		<div class="usa-schedule-panel usa-schedule-interval" data-usa-mode="<?php echo esc_attr( ScheduleEvaluator::MODE_INTERVAL ); ?>" <?php echo ScheduleEvaluator::MODE_INTERVAL === $mode ? '' : 'hidden'; ?>>
+			<p>
+				<label for="usa_starts_at"><?php echo esc_html__( 'Starts at', 'universal-site-announcements' ); ?></label><br />
+				<input type="datetime-local" id="usa_starts_at" name="usa_starts_at" value="<?php echo esc_attr( $starts_local ); ?>" />
+			</p>
+			<p>
+				<label for="usa_ends_at"><?php echo esc_html__( 'Ends at (exclusive)', 'universal-site-announcements' ); ?></label><br />
+				<input type="datetime-local" id="usa_ends_at" name="usa_ends_at" value="<?php echo esc_attr( $ends_local ); ?>" />
+			</p>
+			<p class="description">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %s: site timezone */
+						__( 'Times use the site timezone (%s) and are stored as UTC. For a notice through 31 Dec, set Ends at to 1 Jan 00:00.', 'universal-site-announcements' ),
+						$tz
+					)
+				);
+				?>
+			</p>
+		</div>
+
+		<div class="usa-schedule-panel usa-schedule-weekly" data-usa-mode="<?php echo esc_attr( ScheduleEvaluator::MODE_WEEKLY ); ?>" <?php echo ScheduleEvaluator::MODE_WEEKLY === $mode ? '' : 'hidden'; ?>>
+			<fieldset>
+				<legend><?php echo esc_html__( 'Active weekdays', 'universal-site-announcements' ); ?></legend>
+				<?php foreach ( $day_labels as $n => $label ) : ?>
+					<label style="display:block;margin:2px 0;">
+						<input type="checkbox" name="usa_weekdays[]" value="<?php echo esc_attr( (string) $n ); ?>" <?php checked( in_array( $n, $weekdays, true ) ); ?> />
+						<?php echo esc_html( $label ); ?>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
+			<p class="description">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %s: site timezone */
+						__( 'All day on selected weekdays, using the WordPress site timezone (%s). No start/end clock times in this version.', 'universal-site-announcements' ),
+						$tz
+					)
+				);
+				?>
+			</p>
+			<p>
+				<label for="usa_weekly_starts_on"><?php echo esc_html__( 'Weekly starts on', 'universal-site-announcements' ); ?></label><br />
+				<input type="date" id="usa_weekly_starts_on" name="usa_weekly_starts_on" value="<?php echo esc_attr( $weekly_starts ); ?>" />
+			</p>
+			<p>
+				<label for="usa_weekly_ends_on"><?php echo esc_html__( 'Weekly ends after', 'universal-site-announcements' ); ?></label><br />
+				<input type="date" id="usa_weekly_ends_on" name="usa_weekly_ends_on" value="<?php echo esc_attr( $weekly_ends ); ?>" />
+			</p>
+			<p class="description">
+				<?php echo esc_html__( 'Optional all-day local calendar dates in the site timezone. Start is inclusive; end includes the whole selected day. Leave either blank for open-ended weekly recurrence.', 'universal-site-announcements' ); ?>
+			</p>
+		</div>
 		<?php
 	}
 
@@ -454,27 +534,85 @@ final class AnnouncementMetaBoxes {
 
 		$tz = $this->schedule->site_timezone_string();
 
+		$mode = isset( $_POST['usa_schedule_mode'] ) ? sanitize_key( wp_unslash( $_POST['usa_schedule_mode'] ) ) : ScheduleEvaluator::MODE_ALWAYS;
+		if ( ! in_array( $mode, ScheduleEvaluator::MODES, true ) ) {
+			$mode = ScheduleEvaluator::MODE_ALWAYS;
+		}
+
 		$starts_raw = isset( $_POST['usa_starts_at'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_starts_at'] ) ) : '';
 		$ends_raw   = isset( $_POST['usa_ends_at'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_ends_at'] ) ) : '';
+		$week_raw   = isset( $_POST['usa_weekdays'] ) ? wp_unslash( $_POST['usa_weekdays'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$w_start    = isset( $_POST['usa_weekly_starts_on'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_weekly_starts_on'] ) ) : '';
+		$w_end      = isset( $_POST['usa_weekly_ends_on'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_weekly_ends_on'] ) ) : '';
 
-		$starts_utc = '' !== $starts_raw ? $this->schedule->site_local_to_utc( $starts_raw, $tz ) : null;
-		$ends_utc   = '' !== $ends_raw ? $this->schedule->site_local_to_utc( $ends_raw, $tz ) : null;
-
-		if ( '' !== $starts_raw && null === $starts_utc ) {
-			$this->queue_error( __( 'Invalid Starts at value.', 'universal-site-announcements' ) );
-		} elseif ( null === $starts_utc ) {
-			delete_post_meta( $post_id, ScheduleEvaluator::META_STARTS_AT );
-		} else {
-			update_post_meta( $post_id, ScheduleEvaluator::META_STARTS_AT, $starts_utc );
+		if ( ! is_array( $week_raw ) ) {
+			$week_raw = array();
 		}
 
-		if ( '' !== $ends_raw && null === $ends_utc ) {
-			$this->queue_error( __( 'Invalid Ends at value.', 'universal-site-announcements' ) );
-		} elseif ( null === $ends_utc ) {
-			delete_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT );
-		} else {
-			update_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT, $ends_utc );
+		// Validate submitted schedule; on failure retain all prior schedule meta unchanged.
+		if ( ScheduleEvaluator::MODE_INTERVAL === $mode ) {
+			$starts_utc = '' !== $starts_raw ? $this->schedule->site_local_to_utc( $starts_raw, $tz ) : null;
+			$ends_utc   = '' !== $ends_raw ? $this->schedule->site_local_to_utc( $ends_raw, $tz ) : null;
+			if ( '' !== $starts_raw && null === $starts_utc ) {
+				$this->queue_error( __( 'Invalid Starts at value. Previous schedule was kept.', 'universal-site-announcements' ) );
+				return;
+			}
+			if ( '' !== $ends_raw && null === $ends_utc ) {
+				$this->queue_error( __( 'Invalid Ends at value. Previous schedule was kept.', 'universal-site-announcements' ) );
+				return;
+			}
+			update_post_meta( $post_id, ScheduleEvaluator::META_MODE, ScheduleEvaluator::MODE_INTERVAL );
+			if ( null === $starts_utc ) {
+				delete_post_meta( $post_id, ScheduleEvaluator::META_STARTS_AT );
+			} else {
+				update_post_meta( $post_id, ScheduleEvaluator::META_STARTS_AT, $starts_utc );
+			}
+			if ( null === $ends_utc ) {
+				delete_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT );
+			} else {
+				update_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT, $ends_utc );
+			}
+			return;
 		}
+
+		if ( ScheduleEvaluator::MODE_WEEKLY === $mode ) {
+			$weekdays = $this->schedule->normalize_weekdays_input( $week_raw );
+			if ( null === $weekdays ) {
+				$this->queue_error( __( 'Invalid weekday selection. Previous schedule was kept.', 'universal-site-announcements' ) );
+				return;
+			}
+			if ( array() === $weekdays ) {
+				$this->queue_error( __( 'Select at least one weekday for weekly recurrence. Previous schedule was kept.', 'universal-site-announcements' ) );
+				return;
+			}
+
+			$window = $this->schedule->parse_weekly_window( $w_start, $w_end );
+			if ( ! $window['ok'] ) {
+				if ( 'schedule_reversed_weekly_window' === $window['diagnostic'] ) {
+					$this->queue_error( __( 'Weekly starts on must not be later than Weekly ends after. Previous schedule was kept.', 'universal-site-announcements' ) );
+				} else {
+					$this->queue_error( __( 'Invalid weekly date window. Previous schedule was kept.', 'universal-site-announcements' ) );
+				}
+				return;
+			}
+
+			update_post_meta( $post_id, ScheduleEvaluator::META_MODE, ScheduleEvaluator::MODE_WEEKLY );
+			update_post_meta( $post_id, ScheduleEvaluator::META_WEEKDAYS, $this->schedule->encode_weekdays( $weekdays ) );
+			if ( null === $window['starts_on'] ) {
+				delete_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_STARTS_ON );
+			} else {
+				update_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_STARTS_ON, $window['starts_on'] );
+			}
+			if ( null === $window['ends_on'] ) {
+				delete_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_ENDS_ON );
+			} else {
+				update_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_ENDS_ON, $window['ends_on'] );
+			}
+			return;
+		}
+
+		// Always: persist mode only; retain interval / weekday / window meta.
+		update_post_meta( $post_id, ScheduleEvaluator::META_MODE, ScheduleEvaluator::MODE_ALWAYS );
 	}
 
 	/**
@@ -584,7 +722,7 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.3.0';
+		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.4.0';
 		$js      = USA_PLUGIN_DIR . 'assets/js/announcement-editor.js';
 		$url     = plugins_url( 'assets/js/announcement-editor.js', USA_PLUGIN_FILE );
 

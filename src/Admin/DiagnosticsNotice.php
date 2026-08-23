@@ -72,6 +72,13 @@ final class DiagnosticsNotice {
 	 * @param string $code Failure code.
 	 */
 	private function message_for_code( string $code ): string {
+		if ( 0 === strpos( $code, 'schedule_' ) ) {
+			return __(
+				'Universal Site Announcements suppressed one or more announcements due to an invalid schedule configuration. Check the announcement schedule mode, weekdays, and weekly date window.',
+				'universal-site-announcements'
+			);
+		}
+
 		if ( 0 === strpos( $code, 'template_' ) || 0 === strpos( $code, 'fs_' ) ) {
 			return __(
 				'Universal Site Announcements suppressed one or more announcements due to an invalid template, unresolved merge tag, or free-shipping threshold failure. Check announcement diagnostics on the edit screen.',

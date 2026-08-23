@@ -99,6 +99,23 @@
 		});
 		syncTokenButtons();
 
+		function syncSchedulePanels() {
+			var modeInput = document.querySelector('input[name="usa_schedule_mode"]:checked');
+			var mode = modeInput ? modeInput.value : 'always';
+			document.querySelectorAll('.usa-schedule-panel').forEach(function (panel) {
+				var panelMode = panel.getAttribute('data-usa-mode');
+				if (panelMode === mode) {
+					panel.removeAttribute('hidden');
+				} else {
+					panel.setAttribute('hidden', 'hidden');
+				}
+			});
+		}
+		document.querySelectorAll('input[name="usa_schedule_mode"]').forEach(function (el) {
+			el.addEventListener('change', syncSchedulePanels);
+		});
+		syncSchedulePanels();
+
 		document.querySelectorAll('.usa-insert-token').forEach(function (btn) {
 			btn.addEventListener('click', function () {
 				insertAtCursor(btn.getAttribute('data-token') || '');

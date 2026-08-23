@@ -365,3 +365,19 @@ The M3 **Announcement source** radio remains **unchanged in M4**. Preserving it 
 | 0.2-draft | 2026-08-23 | Incorporate fail-closed invalid data; batched migration; save-failure retention; source UX deferred; TZ/migration tests (pre-freeze) |
 | 0.3-draft | 2026-08-23 | Add optional weekly recurrence window (`_usa_weekly_starts_on` / `_usa_weekly_ends_on`); remove bounded recurrence from non-goals |
 | 1.0-frozen | 2026-08-23 | PO freeze: malformed weekly-window fail-closed; resumable batched migration with persisted cursor (no WP-Cron); schema version bumps only on full completion |
+
+---
+
+## 14. Closure evidence
+
+**Implemented:** 0.4.0 — see [m4-weekly-recurring-schedule.md](../closure/m4-weekly-recurring-schedule.md).
+
+| Evidence | Result |
+|----------|--------|
+| PHPUnit | 92 tests OK |
+| PHPCS | Clean |
+| DEV acceptance | Always / interval / Mon+Fri weekly / retention / validation / Store Notice attrs; fixtures restored |
+| Schema | `usa_schema_version` = 4 on DEV after resumable batch completion |
+
+Source-inference UX was **not** changed in M4 (next task).
+
