@@ -5,13 +5,19 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Text domain / slug:** `universal-site-announcements`  
 **PHP namespace:** `USA\`  
-**Version:** 0.1.0 (M1)
+**Version:** 0.2.0 (M2)
 
 ## Status
 
 **M1 (Core manual announcement bar) is implemented.** See [docs/plans/M1_CORE_MANUAL_ANNOUNCEMENT_BAR.md](docs/plans/M1_CORE_MANUAL_ANNOUNCEMENT_BAR.md) and [docs/closure/m1-core-manual-announcement-bar.md](docs/closure/m1-core-manual-announcement-bar.md).
 
-M2 (scheduling, rotation, free-shipping provider) is not started.
+**M2 (scheduling, rotation, free-shipping provider) is implemented.** See [docs/plans/M2_SCHEDULING_ROTATION_FREE_SHIPPING.md](docs/plans/M2_SCHEDULING_ROTATION_FREE_SHIPPING.md) and [docs/closure/m2-scheduling-rotation-free-shipping.md](docs/closure/m2-scheduling-rotation-free-shipping.md).
+
+### M2 behaviour (summary)
+
+- **Schedule:** Starts at / Ends at (exclusive); site timezone in admin; UTC store + compare.
+- **Rotation:** Two or more active messages fade with pause/resume outside the Store Notice `<p>`.
+- **Free shipping:** Optional provider announcement; threshold display requires Universal Multicurrency ≥ 1.2.0 (`umc_get_free_shipping_threshold_display`). Missing/null API → provider suppressed (no base-currency guess).
 
 ## Requirements
 

@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace USA\Announcement;
 
 /**
- * Selects the single announcement to render in M1.
+ * Selects active announcement content(s) for the store notice bar.
  */
 final class Selector {
 
@@ -31,14 +31,28 @@ final class Selector {
 	}
 
 	/**
-	 * First eligible announcement content, or null.
+	 * Ordered list of active announcement HTML contents.
+	 *
+	 * @return list<string>
+	 */
+	public function active_contents(): array {
+		$rows     = $this->repository->get_active();
+		$contents = array();
+		foreach ( $rows as $row ) {
+			$contents[] = $row['content'];
+		}
+		return $contents;
+	}
+
+	/**
+	 * First eligible announcement content, or null (compat).
 	 */
 	public function first_content(): ?string {
-		$rows = $this->repository->get_eligible_manual();
-		if ( array() === $rows ) {
+		$contents = $this->active_contents();
+		if ( array() === $contents ) {
 			return null;
 		}
-		return $rows[0]['content'];
+		return $contents[0];
 	}
 
 	/**

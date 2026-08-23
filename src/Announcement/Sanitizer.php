@@ -15,7 +15,7 @@ namespace USA\Announcement;
 final class Sanitizer {
 
 	/**
-	 * Allowed tags and attributes.
+	 * Allowed tags and attributes for manual announcement content.
 	 *
 	 * @return array<string, array<string, bool>>
 	 */
@@ -33,12 +33,67 @@ final class Sanitizer {
 	}
 
 	/**
+	 * Narrow allowlist for wc_price / UMC formatted_html fragments.
+	 *
+	 * @return array<string, array<string, bool>>
+	 */
+	public function price_allowed_html(): array {
+		return array(
+			'span' => array(
+				'class'       => true,
+				'title'       => true,
+				'aria-hidden' => true,
+				'style'       => true,
+			),
+			'bdi'  => array(
+				'class' => true,
+				'dir'   => true,
+			),
+			'abbr' => array(
+				'class' => true,
+				'title' => true,
+			),
+			'b'    => array(
+				'class' => true,
+			),
+		);
+	}
+
+	/**
+	 * Merged allowlist for final announcement output (manual + price markup).
+	 *
+	 * @return array<string, array<string, bool>>
+	 */
+	public function output_allowed_html(): array {
+		return array_merge( $this->allowed_html(), $this->price_allowed_html() );
+	}
+
+	/**
 	 * Sanitise announcement HTML and enforce blank-target rel.
 	 *
 	 * @param string $html Raw HTML.
 	 */
 	public function sanitize( string $html ): string {
 		$clean = wp_kses( $html, $this->allowed_html() );
+		return $this->enforce_blank_rel( $clean );
+	}
+
+	/**
+	 * Sanitise UMC/wc_price amount HTML with the narrow price allowlist.
+	 *
+	 * @param string $html Price HTML fragment.
+	 */
+	public function sanitize_price_html( string $html ): string {
+		return wp_kses( $html, $this->price_allowed_html() );
+	}
+
+	/**
+	 * Sanitise final bar output (manual links + price markup).
+	 *
+	 * @param string $html Announcement HTML.
+	 */
+	public function sanitize_output( string $html ): string {
+		$clean = wp_kses( $html, $this->output_allowed_html() );
 		return $this->enforce_blank_rel( $clean );
 	}
 

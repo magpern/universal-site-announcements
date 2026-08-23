@@ -1,0 +1,72 @@
+/**
+ * Universal Site Announcements — multi-message rotation shell.
+ *
+ * Shell must not restyle the host store-notice bar; pause control overlays
+ * without compressing bar width.
+ */
+
+.usa-announcement-shell {
+	position: relative;
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.usa-announcement-shell > .woocommerce-store-notice.demo_store {
+	width: 100%;
+	box-sizing: border-box;
+	margin: 0;
+}
+
+.usa-announcement-bar__message {
+	display: none;
+	opacity: 0;
+	transition: opacity 600ms ease;
+}
+
+.usa-announcement-bar__message.is-active {
+	display: inline;
+	opacity: 1;
+}
+
+.usa-announcement-shell--rotating .usa-announcement-bar__message {
+	display: none;
+}
+
+.usa-announcement-shell--rotating .usa-announcement-bar__message.is-active {
+	display: inline;
+}
+
+.usa-announcement-shell--rotating .usa-announcement-bar__message.is-fading-out {
+	display: inline;
+	opacity: 0;
+}
+
+.usa-announcement-bar__toggle {
+	display: none;
+	position: absolute;
+	top: 50%;
+	right: 0.75rem;
+	transform: translateY(-50%);
+	z-index: 2;
+	margin: 0;
+	padding: 0.25rem 0.5rem;
+	font: inherit;
+	font-size: 0.75rem;
+	line-height: 1.2;
+	cursor: pointer;
+	border: 1px solid currentColor;
+	background: transparent;
+	color: inherit;
+	opacity: 0.85;
+}
+
+.usa-announcement-shell--rotating .usa-announcement-bar__toggle {
+	display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.usa-announcement-bar__message {
+		transition: none;
+	}
+}
