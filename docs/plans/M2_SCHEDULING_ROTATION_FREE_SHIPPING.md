@@ -1,12 +1,15 @@
 # M2 — Scheduling, Accessible Rotation, and Free-Shipping Provider
 
-**Status:** DRAFT — pending PO approval  
+**Status:** FROZEN — PO APPROVED  
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Plugin:** Universal Site Announcements (`universal-site-announcements`)  
 **Namespace:** `USA\`  
 **Parent architecture:** [MASTER_PLAN.md](MASTER_PLAN.md) (M0 frozen)  
 **M1 baseline:** [M1_CORE_MANUAL_ANNOUNCEMENT_BAR.md](M1_CORE_MANUAL_ANNOUNCEMENT_BAR.md) / [m1-core-manual-announcement-bar.md](../closure/m1-core-manual-announcement-bar.md)  
-**M1 completion SHA:** `34b3a36f84156a442636861790489a76e1220603`
+**M1 completion SHA:** `34b3a36f84156a442636861790489a76e1220603`  
+**Frozen:** 2026-08-23  
+
+**UMC prerequisite:** **RESOLVED** — Universal Multicurrency **v1.2.0** public API verified (see §7).
 
 ---
 
@@ -18,7 +21,7 @@ Complete the planned M2 feature set:
 - Multiple active announcements with deterministic ordering.
 - Accessible fade rotation with pause/resume.
 - A dynamic WooCommerce free-shipping announcement that never invents a threshold.
-- Truthful currency-aware threshold display through a required Universal Multicurrency (UMC) public API (separate prerequisite work).
+- Truthful currency-aware threshold display through the Universal Multicurrency (UMC) public API `umc_get_free_shipping_threshold_display()`.
 
 ### Explicit non-goals
 
@@ -26,8 +29,9 @@ Complete the planned M2 feature set:
 - Geolocation or visitor-location determination.
 - Elementor widgets or visual redesign of the host Store Notice bar.
 - Cart free-shipping progress-bar fixes (other projects).
-- Implementing or merging UMC API changes inside this repository or this planning PR.
+- Implementing or merging UMC API changes inside this repository.
 - Mutating `woocommerce_demo_store`, `woocommerce_demo_store_notice`, shipping settings, or theme files.
+- Instantiating UMC internal services, reading exchange rates, inspecting the `umc_currency` cookie for money math, or reconstructing converted thresholds.
 
 ---
 
@@ -61,14 +65,17 @@ Complete the planned M2 feature set:
 
 **Implication:** A simple `min_amount` threshold claim can be truthful on this site when the displayed amount uses UMC’s checkout-aligned conversion path. Compatibility cannot be inferred for arbitrary future callbacks—see §6 eligibility gate.
 
-### 2.4 Universal Multicurrency
+### 2.4 Universal Multicurrency (verified v1.2.0)
 
 | Item | Finding |
 |------|---------|
-| Threshold conversion path | `PriceConversionService::convert_amount()` via `ShippingConversion` on free-shipping availability |
-| Active currency cookie | `umc_currency` |
-| Public threshold-display API | **Not present** — separate UMC prerequisite plan and PR required |
-| Enabled shopper currencies | Re-discovered at acceptance time from live UMC settings (snapshot at planning: SEK, PLN, DKK enabled) |
+| Release | **v1.2.0** (annotated tag → commit `a1fe8d842bfbc893e94cc45047a9a7e1f59b37e3`) |
+| Public symbol | `umc_get_free_shipping_threshold_display( string $base_threshold ): ?array` |
+| Documentation | `docs/HOOKS.md`, `docs/adr/0034-free-shipping-threshold-display-api.md`, `docs/architecture/free-shipping-threshold-display-api.md` |
+| Implementation | `src/api.php` → `FreeShippingThresholdDisplayService` → shared `FreeShippingThresholdResolver` (same path as `ShippingConversion` eligibility) |
+| Success shape | `formatted_html`, `amount`, `currency_code` |
+| Failure | `null` (missing/invalid input, unbound service, non-convertible request, missing foreign rate, over-precision base input) |
+| Consumer rule | Use `formatted_html` for presentation; do not convert, re-round, or rebuild formatting |
 
 ### 2.5 Caching / personalisation
 
@@ -84,16 +91,16 @@ Complete the planned M2 feature set:
 
 ## 3. Milestone structure and sequencing
 
-Scheduling and rotation may proceed without the UMC API. The free-shipping provider remains **blocked** until the UMC threshold-display API is merged and verified.
-
 ```mermaid
 flowchart LR
-  wp1["WP1 UMC API prerequisite"] --> wp4["WP4 Free-shipping provider"]
+  wp1["WP1 UMC API prerequisite ✓"] --> wp4["WP4 Free-shipping provider"]
   wp2["WP2 Scheduling"] --> wp3["WP3 Rotation"]
   wp2 --> wp5["WP5 Integration acceptance"]
   wp3 --> wp5
   wp4 --> wp5
 ```
+
+WP1 is complete. Scheduling, rotation, and provider proceed together in the M2 implementation branch.
 
 ---
 
@@ -103,7 +110,7 @@ flowchart LR
 
 | Field | Storage | Admin |
 |-------|---------|--------|
-| `_usa_starts_at` | UTC instant (ISO-8601 / MySQL datetime UTC) | Label **Starts at** — input and display in **WordPress site timezone** |
+| `_usa_starts_at` | UTC instant (MySQL datetime UTC `Y-m-d H:i:s`) | Label **Starts at** — input and display in **WordPress site timezone** |
 | `_usa_ends_at` | UTC instant | Label **Ends at (exclusive)** — input and display in site timezone |
 
 **Save path:** Convert the administrator’s site-timezone datetime to UTC, then store UTC.
@@ -213,85 +220,87 @@ Generate `Free shipping on orders of {amount} or more` only when **all** hold:
 2. Reference package resolves to at least one Free Shipping method with `requires=min_amount` and positive numeric `min_amount`.
 3. Qualifying methods do not conflict on `min_amount` (zero → suppress; one → use it; many with same amount → use that amount; many with differing amounts → suppress).
 4. Eligibility gate passes (§6.3).
-5. Threshold display context is safe (§6.4).
+5. UMC public API returns a non-null display result for the base threshold (§6.4).
 
-Suppress (no visitor-facing claim) for: WooCommerce unavailable; absent qualifying zone/method; `requires` in `{coupon, either, both, ''}`; conflicting thresholds; failed eligibility gate; missing/failed UMC API when UMC is active.
+Suppress (no visitor-facing claim) for: WooCommerce unavailable; absent qualifying zone/method; `requires` in `{coupon, either, both, ''}`; conflicting thresholds; failed eligibility gate; UMC plugin missing; older UMC without the public function; API returns `null`.
 
 ### 6.3 Eligibility gate (concrete)
 
 A runtime callback inventory **cannot** decide semantic compatibility of arbitrary code. Therefore:
 
-1. Maintain an **explicit allowlist** of known-compatible callbacks on `woocommerce_shipping_free_shipping_is_available`. The audited compatible callback is UMC’s `ShippingConversion::filter_free_shipping_availability` (exact class/method identity as registered).
+1. Maintain an **explicit allowlist** of known-compatible callbacks on `woocommerce_shipping_free_shipping_is_available`. The audited compatible callback is `UMC\Integration\ShippingConversion::filter_free_shipping_availability`.
 2. If **any other** callback is registered on that hook, **suppress** the provider.
 3. Advanced integrator escape hatch: filter `usa_free_shipping_provider_eligibility_verified` may return true only for a deliberate, verified override after site-specific review.
 4. Admin diagnostic must identify the relevant hook and callback category (for example “non-allowlisted callback on `woocommerce_shipping_free_shipping_is_available`”).
 
 Cart-progress-only filters that do not register on the WC availability hook do not by themselves fail this gate.
 
-### 6.4 Currency display and UMC
+### 6.4 Currency display and UMC (authoritative consumer contract)
 
-| UMC state | Provider display rule |
-|-----------|------------------------|
-| **UMC active** | Provider **requires** the UMC threshold-display API for **all** provider output. Do **not** fall back to independent `wc_price(base)`. If the API is missing or fails, suppress the provider + admin diagnostic. |
-| **UMC inactive** | Format the authoritative base `min_amount` with WooCommerce `wc_price()` in store base currency only. |
+| Condition | Provider behaviour |
+|-----------|-------------------|
+| `function_exists( 'umc_get_free_shipping_threshold_display' )` is false | **Suppress** (UMC missing or pre-1.2.0). Do **not** fall back to `wc_price( base )`. |
+| API returns `null` | **Suppress**. Do **not** guess or show unconverted base threshold. |
+| API returns three-key array | Render configured template using **`formatted_html` unchanged** (after narrow price `wp_kses`). Do not re-convert, re-round, or rebuild money formatting. |
 
-USA must not independently convert, round, or format converted thresholds.
+USA is a public-API consumer only. It must not instantiate UMC internals, call `PriceConversionService`, inspect rates, read `umc_currency` for arithmetic, or duplicate `ShippingConversion` logic.
 
-Pass `formatted_html` through a narrow `wp_kses` price allowlist before render.
+`amount` / `currency_code` may be used only as documented (diagnostics / non-presentation); presentation uses `formatted_html`.
 
 Default template filter: `usa_free_shipping_message_template`.
 
 ---
 
-## 7. UMC prerequisite (cross-repository)
+## 7. UMC prerequisite verification (WP1 — COMPLETE)
 
-### 7.1 Required API behaviour
+### 7.1 Verified release
 
-UMC must expose a documented public API whose return contract is fixed:
+| Field | Value |
+|-------|-------|
+| Version | **1.2.0** |
+| Tag | `v1.2.0` (annotated) |
+| Release commit SHA | `a1fe8d842bfbc893e94cc45047a9a7e1f59b37e3` |
+| Public symbol | `umc_get_free_shipping_threshold_display( string $base_threshold ): ?array` |
+| Docs | `docs/HOOKS.md` § Public PHP API; ADR-0034; `docs/architecture/free-shipping-threshold-display-api.md` |
+| Facade | `src/api.php` |
+| Services | `src/PublicApi/FreeShippingThresholdDisplayService.php`, `src/Integration/FreeShippingThresholdResolver.php` |
+| Tests | `tests/integration/FreeShippingThresholdDisplayApiTest.php` (parity with eligibility path) |
+
+### 7.2 Contract consumed by USA
 
 ```php
-[
-    'formatted_html' => string, // ready for narrow kses; from wc_price after conversion
-    'amount'         => string, // decimal string; same rounding as checkout threshold comparison
-    'currency_code'  => string,
-]
+$threshold = umc_get_free_shipping_threshold_display( $base_threshold_decimal_string );
+// success:
+// [
+//   'formatted_html' => string,
+//   'amount'         => string,
+//   'currency_code'  => string,
+// ]
+// failure: null
 ```
 
-### 7.2 Required reuse path
+Feature detection: `function_exists( 'umc_get_free_shipping_threshold_display' )`.
 
-Must reuse `PriceConversionService::convert_amount()` and the same active-currency formatting semantics used by `ShippingConversion::filter_free_shipping_availability` (request-scoped; do not persist into method settings).
+### 7.3 Sequencing
 
-### 7.3 Prerequisite acceptance evidence (before USA provider enablement)
+1. ~~Separate UMC plan freeze and implementation PR~~ — done (UMC v1.2.0).
+2. ~~UMC API merged and verified~~ — done (this freeze).
+3. USA work packages 2–5 consume the API.
 
-- UMC PHPUnit (or equivalent) proves displayed amount matches free-shipping eligibility boundaries for base and each enabled shopper currency.
-- Symbol documented in UMC `HOOKS.md` (exact name chosen by UMC implementers).
-- Change merged to UMC’s default branch and available on the target site.
-
-### 7.4 Sequencing
-
-1. Separate UMC plan freeze and implementation PR (out of scope for this USA planning PR).
-2. UMC API merged and verified.
-3. USA work package 4 (provider) and package 5 (acceptance) consume the API.
-
-**This USA draft does not implement UMC.**
+**This USA milestone does not modify UMC.**
 
 ---
 
 ## 8. Ordered work packages
 
-### WP1 — UMC prerequisite verification and dependency handoff
+### WP1 — UMC prerequisite verification and dependency handoff — DONE
 
-**Scope:** Checklist and stop conditions for the UMC API; document allowlisted eligibility callback identity.  
-**Exclusions:** UMC code; USA provider enablement.  
-**Dependencies:** None.  
-**Expected artefacts:** Acceptance checklist in closure docs; no USA feature code required beyond readiness notes.  
-**Validation:** Confirm API presence, return shape, and boundary tests on target.  
-**Stop:** API missing, shape wrong, or rounding diverges from checkout → do not start WP4.
+Verified against released UMC v1.2.0 source and docs. Provider unblocked.
 
 ### WP2 — Scheduling and active-announcement resolution
 
 **Scope:** Schedule meta + admin labels; UTC save/compare; priority edit/validate in list and editor; extend Repository/Selector to return ordered active list; schedule-aware active rule.  
-**Exclusions:** Rotation JS; provider; UMC.  
+**Exclusions:** Rotation JS; provider.  
 **Dependencies:** M1 complete.  
 **Files (expected):** `AnnouncementMetaBoxes`, `Repository`, `Selector`, new `ScheduleEvaluator`, list-table columns, unit tests.  
 **Validation:** Exclusive-end boundaries; site-TZ input → UTC storage; DST transition fixtures; priority ordering.  
@@ -300,7 +309,7 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 ### WP3 — Rotation rendering, accessibility, and assets
 
 **Scope:** Multi-span inner HTML; layout-safe shell + pause button; CSS/JS enqueue rules; reduced-motion / no-JS paths; preserve M1 outer `<p>` contract.  
-**Exclusions:** Provider; UMC.  
+**Exclusions:** Provider.  
 **Dependencies:** WP2 active list.  
 **Files (expected):** `StoreNoticeRenderer`, `ContentReplacer` helpers, `assets/css|js`, integration tests for shell markup and `data-position`.  
 **Validation:** Desktop/mobile full-width bar preserved; pause keyboard + sessionStorage; no aria-live; single message = no script.  
@@ -312,14 +321,14 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 **Exclusions:** Scheduling/rotation already delivered; UMC implementation.  
 **Dependencies:** WP1 green; WP2 for schedule on provider posts.  
 **Files (expected):** `WooCommerceFreeShippingProvider`, eligibility gate, diagnostics, admin source UI, tests.  
-**Validation:** Suppression matrix; allowlist behaviour; UMC-active requires API; UMC-inactive base `wc_price`.  
-**Stop:** Non-allowlisted eligibility callback without verified escape hatch; UMC active without API.
+**Validation:** Suppression matrix; allowlist behaviour; UMC API required; no base `wc_price` fallback.  
+**Stop:** Non-allowlisted eligibility callback without verified escape hatch; API unavailable.
 
 ### WP5 — Cross-repository integration acceptance and closure
 
-**Scope:** Full acceptance matrix; currency re-discovery; currency-switch / cache notes; M1 rollback intact; closure document; version bump as appropriate.  
+**Scope:** Full acceptance matrix; currency re-discovery; currency-switch / cache notes; M1 rollback intact; closure document; version bump **0.1.0 → 0.2.0**.  
 **Exclusions:** M3+ features; production release tag unless separately requested.  
-**Dependencies:** WP2–WP4 as applicable; UMC API on target for provider rows.  
+**Dependencies:** WP2–WP4; UMC API on target for provider rows.  
 **Validation:** See §9.  
 **Stop:** Any failed truthfulness or a11y acceptance item.
 
@@ -334,11 +343,14 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 - Active list with mixed scheduled/unscheduled posts.
 - ContentReplacer + shell: `data-position` retained; pause button outside `<p>`; full-width regression fixtures where practical.
 - Provider: `requires` matrix; conflicting thresholds; non-allowlisted callback suppression; uniqueness regardless of schedule.
-- UMC inactive: base `wc_price` path.
-- UMC active: mock/real API required; no silent base fallback.
+- UMC API available + valid → provider can render.
+- UMC missing / old UMC / API `null` → provider suppressed safely; other announcements still work.
+- Base and foreign: `formatted_html` used unchanged.
+- USA performs no rate multiplication, monetary rounding, UMC internal inspection, or reconstructed money formatting.
+- Scheduling/rotation independent of provider availability.
 - JS unit (or equivalent): pause state; reduced-motion; no aria-live on tick.
 
-### Manual
+### Manual / DEV acceptance
 
 | Scenario | Expected |
 |----------|----------|
@@ -349,6 +361,7 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 | Currency switch | Announcement amount updates; no stale wrong-currency HTML under current cache posture |
 | Disable USA / deactivate plugin | M1 rollback behaviour intact; WC options untouched |
 | Second enabled provider save | Blocked with admin error |
+| UMC API unavailable | Free-shipping announcement suppressed; manuals rotate normally |
 
 ---
 
@@ -359,7 +372,7 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 | DST / timezone errors | UTC storage and UTC comparison only |
 | Shell breaks full-width bar | Layout requirement + desktop/mobile acceptance |
 | Arbitrary eligibility callbacks | Allowlist + suppress + escape hatch |
-| UMC API lag | Provider blocked on WP1; scheduling/rotation independent |
+| UMC API unavailable at runtime | Fail closed for provider only |
 | Future edge cache | Vary/bypass on `umc_currency` before calling cache-safe |
 | Duplicate provider schedules | Uniqueness ignores schedule |
 
@@ -367,14 +380,13 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 
 ## 11. Architecture decisions
 
-**No open PO decisions.** All product architecture remains as frozen in M0; this draft only specifies M2 implementation detail.
+**No open PO decisions.**
 
 | Topic | Decision |
 |-------|----------|
 | Schedule time model | Site TZ input/display; UTC store and compare |
 | Eligibility compatibility | Allowlist UMC callback; suppress other hooks; verified escape hatch |
-| UMC active | API required for all provider output |
-| UMC inactive | `wc_price(base)` only |
+| Threshold display | UMC public API required; no `wc_price(base)` fallback |
 | Provider uniqueness | At most one enabled provider, schedule-independent |
 | Pause shell | Sibling outside `<p>`; must not alter bar full-width look |
 
@@ -385,3 +397,4 @@ Must reuse `PriceConversionService::convert_amount()` and the same active-curren
 | Version | Date | Notes |
 |---------|------|-------|
 | 0.1-draft | 2026-08-23 | Initial M2 draft for PO approval |
+| 1.0-frozen | 2026-08-23 | Freeze: UMC v1.2.0 prerequisite verified; amend §6.4 to fail closed (no base `wc_price` fallback); WP1 complete |
