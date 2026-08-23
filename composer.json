@@ -1,0 +1,39 @@
+{
+    "name": "magpern/universal-site-announcements",
+    "description": "Generic WordPress plugin for site-wide announcement bars with safe inline links.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.1"
+    },
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpunit/phpunit": "^9.6",
+        "wp-coding-standards/wpcs": "^3.1",
+        "yoast/phpunit-polyfills": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "USA\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "USA\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "phpcs": "phpcs",
+        "phpcbf": "phpcbf",
+        "test:unit": "phpunit -c phpunit.xml.dist"
+    },
+    "config": {
+        "platform": {
+            "php": "8.1.99"
+        },
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "sort-packages": true
+    }
+}

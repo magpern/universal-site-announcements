@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<ruleset name="Universal Site Announcements">
+	<description>WPCS for Universal Site Announcements</description>
+	<file>.</file>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+	<config name="minimum_supported_wp_version" value="6.5"/>
+	<rule ref="WordPress">
+		<exclude name="WordPress.Files.FileName"/>
+		<!-- Frozen M0 identity uses USA / usa (three letters). -->
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.ShortPrefixPassed"/>
+	</rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="usa"/>
+				<element value="USA"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

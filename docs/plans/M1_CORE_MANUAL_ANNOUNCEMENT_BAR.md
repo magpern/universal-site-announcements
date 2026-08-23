@@ -229,12 +229,14 @@ No open PO decisions. Content-replacement **mechanism** is an M1 engineering ver
 
 ---
 
-## 10. Closure (filled at M1 completion)
+## 10. Closure
 
-_To be completed after implementation and validation._
+**Status:** CLOSED — 2026-08-23 (v0.1.0)
 
-- Selected content-replacement mechanism:
-- Verification evidence:
-- Automated test results:
-- Development-site acceptance:
-- Explicit M2 deferrals:
+See [docs/closure/m1-core-manual-announcement-bar.md](../closure/m1-core-manual-announcement-bar.md) for:
+
+- Selected content-replacement mechanism (constrained opening-tag fragment splicing)
+- Verification evidence (PHPUnit fixtures including multi-attribute style surgery)
+- Development-site acceptance results
+- Explicit M2 deferrals
+
