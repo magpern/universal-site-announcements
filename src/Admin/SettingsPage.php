@@ -116,7 +116,7 @@ final class SettingsPage {
 								<?php checked( Settings::is_enabled() ); ?>
 							/>
 							<p class="description">
-								<?php echo esc_html__( 'Global on/off for USA content ownership of the Store Notice bar.', 'universal-site-announcements' ); ?>
+								<?php echo esc_html__( 'Global on/off for Universal Site Announcements content ownership of the Store Notice bar.', 'universal-site-announcements' ); ?>
 							</p>
 						</td>
 					</tr>
@@ -211,7 +211,7 @@ final class SettingsPage {
 	}
 
 	/**
-	 * Operator-facing diagnostics already owned by USA.
+	 * Operator-facing diagnostics for this plugin.
 	 */
 	private function render_diagnostics(): void {
 		$umc        = new UmcThresholdDisplay();
@@ -235,8 +235,8 @@ final class SettingsPage {
 				__( '%d ms', 'universal-site-announcements' ),
 				Settings::rotation_fade_ms()
 			),
-			__( 'UMC threshold API', 'universal-site-announcements' )     => $umc->is_available()
-				? __( 'Available (function_exists)', 'universal-site-announcements' )
+			__( 'Universal Multicurrency threshold API', 'universal-site-announcements' ) => $umc->is_available()
+				? __( 'Available', 'universal-site-announcements' )
 				: __( 'Unavailable — free-shipping provider will suppress', 'universal-site-announcements' ),
 			__( 'Last render diagnostic', 'universal-site-announcements' ) => '' !== $render_err
 				? $render_err
