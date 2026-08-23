@@ -65,6 +65,17 @@ final class StoreNoticeRenderer {
 	}
 
 	/**
+	 * Whether the multi-message JS rotation path should run.
+	 *
+	 * Requires two or more active messages and rotation enabled in settings.
+	 *
+	 * @param int $active_count Active announcement count.
+	 */
+	public static function should_rotate( int $active_count ): bool {
+		return $active_count >= 2 && Settings::is_rotation_enabled();
+	}
+
+	/**
 	 * Filter callback.
 	 *
 	 * @param string $html   Upstream notice HTML.
@@ -88,7 +99,8 @@ final class StoreNoticeRenderer {
 			return '';
 		}
 
-		if ( 1 === $count ) {
+		// Single message, or rotation disabled → highest priority only; no shell/JS.
+		if ( ! self::should_rotate( $count ) ) {
 			$inner = $this->sanitizer->sanitize_output( $contents[0] );
 			if ( '' === $inner ) {
 				return '';
@@ -136,7 +148,7 @@ final class StoreNoticeRenderer {
 	}
 
 	/**
-	 * Enqueue rotation CSS/JS when two or more announcements are active.
+	 * Enqueue rotation CSS/JS when the multi-message rotation path is active.
 	 *
 	 * Runs on wp_enqueue_scripts (before the notice filter) so assets can print.
 	 */
@@ -145,12 +157,15 @@ final class StoreNoticeRenderer {
 			return;
 		}
 
-		if ( count( $this->selector->active_contents() ) < 2 ) {
+		$count = count( $this->selector->active_contents() );
+		if ( ! self::should_rotate( $count ) ) {
 			return;
 		}
 
-		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.2.0';
-		$base    = defined( 'USA_PLUGIN_FILE' ) ? plugin_dir_url( USA_PLUGIN_FILE ) : '';
+		$version     = defined( 'USA_VERSION' ) ? USA_VERSION : '0.2.1';
+		$base        = defined( 'USA_PLUGIN_FILE' ) ? plugin_dir_url( USA_PLUGIN_FILE ) : '';
+		$fade_ms     = Settings::rotation_fade_ms();
+		$interval_ms = Settings::rotation_interval_ms();
 
 		wp_enqueue_style(
 			'usa-announcement-bar',
@@ -159,12 +174,26 @@ final class StoreNoticeRenderer {
 			$version
 		);
 
+		wp_add_inline_style(
+			'usa-announcement-bar',
+			sprintf( '.usa-announcement-bar__message{transition-duration:%dms;}', $fade_ms )
+		);
+
 		wp_enqueue_script(
 			'usa-announcement-bar',
 			$base . 'assets/js/announcement-bar.js',
 			array(),
 			$version,
 			true
+		);
+
+		wp_localize_script(
+			'usa-announcement-bar',
+			'usaAnnouncementBar',
+			array(
+				'intervalMs' => $interval_ms,
+				'fadeMs'     => $fade_ms,
+			)
 		);
 	}
 }

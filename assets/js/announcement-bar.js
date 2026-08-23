@@ -1,15 +1,27 @@
 /**
  * Universal Site Announcements — accessible fade rotation.
  *
- * ~8s visible / ~600ms fade. Pause via button + sessionStorage.
- * No aria-live on automatic ticks. Respects prefers-reduced-motion.
+ * Interval and fade duration come from usaAnnouncementBar (wp_localize_script).
+ * Pause via button + sessionStorage. No aria-live on automatic ticks.
+ * Respects prefers-reduced-motion.
  */
 (function () {
 	'use strict';
 
 	var STORAGE_KEY = 'usa_announcement_bar_paused';
-	var INTERVAL_MS = 8000;
-	var FADE_MS = 600;
+	var config = window.usaAnnouncementBar || {};
+	var INTERVAL_MS = parseInt(config.intervalMs, 10);
+	var FADE_MS = parseInt(config.fadeMs, 10);
+
+	if (!INTERVAL_MS || INTERVAL_MS < 1) {
+		INTERVAL_MS = 8000;
+	}
+	if (!FADE_MS || FADE_MS < 1) {
+		FADE_MS = 600;
+	}
+	if (FADE_MS >= INTERVAL_MS) {
+		FADE_MS = Math.min(600, Math.floor(INTERVAL_MS / 2) || 1);
+	}
 
 	function prefersReducedMotion() {
 		return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
