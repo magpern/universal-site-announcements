@@ -197,26 +197,76 @@ JS;
 	 *
 	 * @param int $post_id Post ID.
 	 */
-	private function format_schedule( int $post_id ): string {
-		$tz      = $this->schedule->site_timezone_string();
-		$start   = (string) get_post_meta( $post_id, ScheduleEvaluator::META_STARTS_AT, true );
-		$end     = (string) get_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT, true );
-		$start_l = '' !== $start ? $this->schedule->utc_to_site_local( $start, $tz ) : null;
-		$end_l   = '' !== $end ? $this->schedule->utc_to_site_local( $end, $tz ) : null;
+	public function format_schedule( int $post_id ): string {
+		$mode_raw = (string) get_post_meta( $post_id, ScheduleEvaluator::META_MODE, true );
+		$starts   = (string) get_post_meta( $post_id, ScheduleEvaluator::META_STARTS_AT, true );
+		$ends     = (string) get_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT, true );
+		$resolved = $this->schedule->resolve_mode( $mode_raw, $starts, $ends );
 
-		if ( null === $start_l && null === $end_l ) {
+		if ( ! $resolved['ok'] || null === $resolved['mode'] ) {
+			return __( 'Invalid schedule', 'universal-site-announcements' );
+		}
+
+		$mode = $resolved['mode'];
+		$tz   = $this->schedule->site_timezone_string();
+
+		if ( ScheduleEvaluator::MODE_ALWAYS === $mode ) {
 			return __( 'Always', 'universal-site-announcements' );
 		}
 
-		$parts = array();
-		if ( null !== $start_l ) {
-			/* translators: %s: local datetime */
-			$parts[] = sprintf( __( 'From %s', 'universal-site-announcements' ), str_replace( 'T', ' ', $start_l ) );
+		if ( ScheduleEvaluator::MODE_INTERVAL === $mode ) {
+			$start_l = '' !== $starts ? $this->schedule->utc_to_site_local( $starts, $tz ) : null;
+			$end_l   = '' !== $ends ? $this->schedule->utc_to_site_local( $ends, $tz ) : null;
+
+			if ( null === $start_l && null === $end_l ) {
+				return __( 'Always', 'universal-site-announcements' );
+			}
+
+			$parts = array();
+			if ( null !== $start_l ) {
+				/* translators: %s: local datetime */
+				$parts[] = sprintf( __( 'From %s', 'universal-site-announcements' ), str_replace( 'T', ' ', $start_l ) );
+			}
+			if ( null !== $end_l ) {
+				/* translators: %s: local datetime (exclusive end) */
+				$parts[] = sprintf( __( 'Until %s (exclusive)', 'universal-site-announcements' ), str_replace( 'T', ' ', $end_l ) );
+			}
+			return implode( ' · ', $parts );
 		}
-		if ( null !== $end_l ) {
-			/* translators: %s: local datetime (exclusive end) */
-			$parts[] = sprintf( __( 'Until %s (exclusive)', 'universal-site-announcements' ), str_replace( 'T', ' ', $end_l ) );
+
+		// Weekly.
+		$weekdays = $this->schedule->parse_weekdays_json(
+			(string) get_post_meta( $post_id, ScheduleEvaluator::META_WEEKDAYS, true )
+		);
+		$labels   = $this->schedule->weekday_labels();
+		$days     = array();
+		if ( is_array( $weekdays ) ) {
+			foreach ( $weekdays as $n ) {
+				if ( isset( $labels[ $n ] ) ) {
+					$days[] = $labels[ $n ];
+				}
+			}
 		}
-		return implode( ' · ', $parts );
+		$day_text = array() === $days ? '—' : implode( ', ', $days );
+
+		/* translators: %s: weekday abbreviations */
+		$summary = sprintf( __( 'Weekly: %s', 'universal-site-announcements' ), $day_text );
+
+		$w_start = trim( (string) get_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_STARTS_ON, true ) );
+		$w_end   = trim( (string) get_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_ENDS_ON, true ) );
+		$window  = $this->schedule->parse_weekly_window( $w_start, $w_end );
+		if ( $window['ok'] && ( null !== $window['starts_on'] || null !== $window['ends_on'] ) ) {
+			if ( null !== $window['starts_on'] && null !== $window['ends_on'] ) {
+				$summary .= ' (' . $window['starts_on'] . ' – ' . $window['ends_on'] . ')';
+			} elseif ( null !== $window['starts_on'] ) {
+				/* translators: %s: local Y-m-d */
+				$summary .= ' ' . sprintf( __( '(from %s)', 'universal-site-announcements' ), $window['starts_on'] );
+			} else {
+				/* translators: %s: local Y-m-d */
+				$summary .= ' ' . sprintf( __( '(until %s)', 'universal-site-announcements' ), $window['ends_on'] );
+			}
+		}
+
+		return $summary;
 	}
 }

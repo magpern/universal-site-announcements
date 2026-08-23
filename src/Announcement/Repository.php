@@ -92,12 +92,11 @@ final class Repository {
 				continue;
 			}
 
-			$starts = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_STARTS_AT, true );
-			$ends   = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_ENDS_AT, true );
-			if ( ! $this->schedule->is_active(
-				'' !== $starts ? $starts : null,
-				'' !== $ends ? $ends : null
-			) ) {
+			$schedule = $this->schedule->evaluate_post( (int) $post->ID );
+			if ( null !== $schedule['diagnostic'] ) {
+				DiagnosticsNotice::record_failure( (string) $schedule['diagnostic'] );
+			}
+			if ( ! $schedule['active'] ) {
 				continue;
 			}
 

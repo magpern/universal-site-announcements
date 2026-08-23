@@ -5,11 +5,13 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Text domain / slug:** `universal-site-announcements`  
 **PHP namespace:** `USA\`  
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Status
 
-**M1**, **M2**, and **M3** are implemented. See plans and closure docs under `docs/`.
+**M1**–**M4** are implemented. See plans and closure docs under `docs/`.
+
+**0.4.0** adds schedule modes (always / one-time interval / weekly recurring) with optional weekly date windows in the WordPress site timezone.
 
 **0.3.0** adds dynamic message templates (merge tags), HTML-aware placement validation, product link tokens, and hybrid Universal Multicurrency threshold display.
 
@@ -44,7 +46,7 @@ Announcement `post_content` is a template with optional merge tags:
 
 ### Announcement editor
 
-Source selector (manual / WooCommerce free shipping) above the content editor, dynamic-value insert (threshold / product picker), template preview, enabled, priority, Starts at, Ends at (exclusive), provider diagnostics.
+Source selector (manual / WooCommerce free shipping) above the content editor, dynamic-value insert (threshold / product picker), template preview, enabled, priority, **schedule mode** (Always active / One-time date interval / Weekly recurring), optional weekly weekdays and Weekly starts on / Weekly ends after, provider diagnostics.
 
 ### Settings
 
@@ -68,6 +70,16 @@ Defaults preserve M2 behaviour: rotation on, 8 s interval, 600 ms fade.
 | One message / no-JS / reduced-motion | Static highest-priority message |
 
 USA never reads/writes `woocommerce_demo_store` or `woocommerce_demo_store_notice` as its own on/off switch, and never mutates shipping configuration or theme files.
+
+## Scheduling (M4)
+
+| Mode | Behaviour |
+|------|-----------|
+| Always active | No date/weekday restrictions |
+| One-time date interval | Starts at / Ends at (exclusive) in site timezone; stored and compared as UTC |
+| Weekly recurring | Selected ISO weekdays, all day in the site timezone; optional `Weekly starts on` / `Weekly ends after` (`Y-m-d` local dates) |
+
+Weekly activity requires both a selected local weekday and a local date inside the optional window (absent bounds = indefinite). Invalid stored schedule data suppresses the announcement (never silently “Always”).
 
 ## Development
 

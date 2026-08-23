@@ -178,3 +178,148 @@ if ( ! defined( 'USA_PLUGIN_BASENAME' ) ) {
 	define( 'USA_PLUGIN_BASENAME', 'universal-site-announcements/universal-site-announcements.php' );
 }
 
+/**
+ * @var array<int, array<string, mixed>>
+ */
+$GLOBALS['usa_test_post_meta'] = array();
+
+/**
+ * @var list<int>
+ */
+$GLOBALS['usa_test_post_ids'] = array();
+
+/**
+ * @var string
+ */
+$GLOBALS['usa_test_timezone'] = 'UTC';
+
+if ( ! function_exists( 'get_post_meta' ) ) {
+	/**
+	 * @param int    $post_id Post ID.
+	 * @param string $key     Meta key.
+	 * @param bool   $single  Single.
+	 * @return mixed
+	 */
+	function get_post_meta( $post_id, $key = '', $single = false ) {
+		$post_id = (int) $post_id;
+		$key     = (string) $key;
+		if ( ! isset( $GLOBALS['usa_test_post_meta'][ $post_id ] ) ) {
+			return $single ? '' : array();
+		}
+		if ( '' === $key ) {
+			return $GLOBALS['usa_test_post_meta'][ $post_id ];
+		}
+		if ( ! array_key_exists( $key, $GLOBALS['usa_test_post_meta'][ $post_id ] ) ) {
+			return $single ? '' : array();
+		}
+		$value = $GLOBALS['usa_test_post_meta'][ $post_id ][ $key ];
+		return $single ? $value : array( $value );
+	}
+}
+
+if ( ! function_exists( 'update_post_meta' ) ) {
+	/**
+	 * @param int    $post_id Post ID.
+	 * @param string $key     Meta key.
+	 * @param mixed  $value   Value.
+	 */
+	function update_post_meta( $post_id, $key, $value ): bool {
+		$post_id = (int) $post_id;
+		if ( ! isset( $GLOBALS['usa_test_post_meta'][ $post_id ] ) ) {
+			$GLOBALS['usa_test_post_meta'][ $post_id ] = array();
+		}
+		$GLOBALS['usa_test_post_meta'][ $post_id ][ (string) $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_post_meta' ) ) {
+	/**
+	 * @param int    $post_id Post ID.
+	 * @param string $key     Meta key.
+	 */
+	function delete_post_meta( $post_id, $key ): bool {
+		$post_id = (int) $post_id;
+		$key     = (string) $key;
+		if ( isset( $GLOBALS['usa_test_post_meta'][ $post_id ][ $key ] ) ) {
+			unset( $GLOBALS['usa_test_post_meta'][ $post_id ][ $key ] );
+		}
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_timezone_string' ) ) {
+	/**
+	 * @return string
+	 */
+	function wp_timezone_string(): string {
+		return isset( $GLOBALS['usa_test_timezone'] ) ? (string) $GLOBALS['usa_test_timezone'] : 'UTC';
+	}
+}
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	/**
+	 * @param mixed $data Data.
+	 * @return string|false
+	 */
+	function wp_json_encode( $data ) {
+		return json_encode( $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+	}
+}
+
+if ( ! function_exists( 'get_posts' ) ) {
+	/**
+	 * @param array<string, mixed> $args Args.
+	 * @return list<int>|list<object>
+	 */
+	function get_posts( $args = array() ) {
+		$ids = isset( $GLOBALS['usa_test_post_ids'] ) && is_array( $GLOBALS['usa_test_post_ids'] )
+			? $GLOBALS['usa_test_post_ids']
+			: array();
+		sort( $ids, SORT_NUMERIC );
+		$fields = isset( $args['fields'] ) ? (string) $args['fields'] : '';
+		if ( 'ids' === $fields ) {
+			return array_map( 'intval', $ids );
+		}
+		$out = array();
+		foreach ( $ids as $id ) {
+			$out[] = (object) array(
+				'ID'           => (int) $id,
+				'post_content' => '',
+			);
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists( 'is_admin' ) ) {
+	/**
+	 * @return bool
+	 */
+	function is_admin(): bool {
+		return ! empty( $GLOBALS['usa_test_is_admin'] );
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	/**
+	 * @param string   $hook     Hook.
+	 * @param callable $callback Callback.
+	 * @param int      $priority Priority.
+	 * @param int      $accepted Accepted args.
+	 */
+	function add_action( $hook, $callback, $priority = 10, $accepted = 1 ): bool {
+		unset( $hook, $callback, $priority, $accepted );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_update_post' ) ) {
+	/**
+	 * @param array<string, mixed> $postarr Post.
+	 */
+	function wp_update_post( $postarr ): int {
+		return isset( $postarr['ID'] ) ? (int) $postarr['ID'] : 0;
+	}
+}
+
