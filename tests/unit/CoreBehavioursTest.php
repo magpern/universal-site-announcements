@@ -76,4 +76,41 @@ final class CoreBehavioursTest extends TestCase {
 		$this->assertNull( SeedDecision::content_to_seed( false, '<script></script>', $s ) );
 		$this->assertSame( 'Hello', SeedDecision::content_to_seed( false, 'Hello', $s ) );
 	}
+
+	/**
+	 * Shell wraps the notice paragraph with pause button as sibling.
+	 */
+	public function test_wrap_shell_places_button_outside_paragraph(): void {
+		$upstream = '<p class="woocommerce-store-notice demo_store" data-position="bottom">OLD</p>';
+		$replacer = new ContentReplacer();
+		$replaced = $replacer->replace( $upstream, '<span class="usa-announcement-bar__message is-active">A</span><span class="usa-announcement-bar__message">B</span>' );
+		$this->assertTrue( $replaced['ok'] );
+
+		$button = '<button type="button" class="usa-announcement-bar__toggle" aria-pressed="false">Pause</button>';
+		$html   = $replacer->wrap_shell( $replaced['html'], $button );
+
+		$this->assertStringContainsString( 'class="usa-announcement-shell"', $html );
+		$this->assertStringContainsString( 'data-position="bottom"', $html );
+		$this->assertMatchesRegularExpression(
+			'/<div class="usa-announcement-shell"><p class="woocommerce-store-notice demo_store" data-position="bottom">.*<\/p><button type="button" class="usa-announcement-bar__toggle"/s',
+			$html
+		);
+		$this->assertStringNotContainsString( 'woocommerce-store-notice usa-announcement-shell', $html );
+		// Button must not be nested inside the notice <p>.
+		$this->assertDoesNotMatchRegularExpression(
+			'/<p\b[^>]*>[^<]*<button/i',
+			$html
+		);
+	}
+
+	/**
+	 * Price + manual output allowlist merge.
+	 */
+	public function test_sanitize_output_keeps_price_and_links(): void {
+		$s    = new Sanitizer();
+		$html = 'From <span class="woocommerce-Price-amount"><bdi>10</bdi></span> — <a href="https://ex.test" target="_blank">info</a>';
+		$out  = $s->sanitize_output( $html );
+		$this->assertStringContainsString( 'woocommerce-Price-amount', $out );
+		$this->assertStringContainsString( 'noopener', $out );
+	}
 }

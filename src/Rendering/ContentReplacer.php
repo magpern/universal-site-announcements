@@ -144,4 +144,33 @@ final class ContentReplacer {
 		}
 		return implode( '; ', $kept );
 	}
+
+	/**
+	 * Wrap a successfully replaced store-notice paragraph in the rotation shell
+	 * with a pause button as a sibling outside the &lt;p&gt;.
+	 *
+	 * @param string $replaced_html Full HTML from a successful replace().
+	 * @param string $button_html   Already-escaped pause button markup.
+	 */
+	public function wrap_shell( string $replaced_html, string $button_html ): string {
+		$match = $this->locate_notice_paragraph( $replaced_html );
+		if ( null === $match ) {
+			return $replaced_html;
+		}
+
+		$p_start = strlen( $match['before'] );
+		$close   = stripos( $replaced_html, '</p>', $p_start );
+		if ( false === $close ) {
+			return $replaced_html;
+		}
+
+		$paragraph = substr( $replaced_html, $p_start, ( $close + 4 ) - $p_start );
+
+		return $match['before']
+			. '<div class="usa-announcement-shell">'
+			. $paragraph
+			. $button_html
+			. '</div>'
+			. $match['after'];
+	}
 }

@@ -84,4 +84,30 @@ final class StoreNoticeAttributePreservationTest extends TestCase {
 			$result['html']
 		);
 	}
+
+	/**
+	 * Multi-message shell preserves data-position and keeps button outside &lt;p&gt;.
+	 */
+	public function test_shell_preserves_attributes_and_sibling_button(): void {
+		$upstream = '<p role="complementary" class="woocommerce-store-notice demo_store" data-position="bottom">OLD</p>';
+		$inner    = '<span class="usa-announcement-bar__message is-active">One</span><span class="usa-announcement-bar__message">Two</span>';
+		$replacer = new ContentReplacer();
+		$result   = $replacer->replace( $upstream, $inner );
+		$this->assertTrue( $result['ok'] );
+
+		$html = $replacer->wrap_shell(
+			$result['html'],
+			'<button type="button" class="usa-announcement-bar__toggle" aria-pressed="false">Pause announcements</button>'
+		);
+
+		$this->assertStringContainsString( 'data-position="bottom"', $html );
+		$this->assertStringContainsString( 'role="complementary"', $html );
+		$this->assertStringContainsString( 'usa-announcement-shell', $html );
+		$this->assertStringContainsString( 'usa-announcement-bar__toggle', $html );
+		$this->assertMatchesRegularExpression( '/<\/p><button /', $html );
+		$this->assertDoesNotMatchRegularExpression(
+			'/<div class="usa-announcement-shell"[^>]*woocommerce-store-notice/',
+			$html
+		);
+	}
 }
