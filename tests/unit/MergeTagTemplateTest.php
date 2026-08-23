@@ -120,28 +120,33 @@ final class MergeTagTemplateTest extends TestCase {
 	}
 
 	/**
-	 * Source allowlists.
+	 * Token structure and legacy source validation.
 	 */
 	public function test_source_token_allowlists(): void {
 		$rules  = new SourceTokenRules();
 		$parser = new MergeTagParser();
 
 		$manual = $parser->parse( 'Hi {{product:1}}' );
+		$this->assertNull( $rules->validate_structure( $manual['tokens'] ) );
+		$this->assertFalse( $rules->requires_free_shipping( $manual['tokens'] ) );
 		$this->assertNull( $rules->validate( 'manual', $manual['tokens'] ) );
 
-		$forbidden = $parser->parse( 'Ship {{free_shipping_threshold}}' );
-		$this->assertSame( 'free_shipping_token_forbidden', $rules->validate( 'manual', $forbidden['tokens'] ) );
+		$fs = $parser->parse( 'Ship {{free_shipping_threshold}}' );
+		$this->assertNull( $rules->validate_structure( $fs['tokens'] ) );
+		$this->assertTrue( $rules->requires_free_shipping( $fs['tokens'] ) );
+		// Legacy validate still forbids threshold on explicit manual source.
+		$this->assertSame( 'free_shipping_token_forbidden', $rules->validate( 'manual', $fs['tokens'] ) );
 
 		$fs_ok = $parser->parse( 'Ship {{free_shipping_threshold}} and {{product:2}}' );
 		$this->assertNull( $rules->validate( 'woocommerce_free_shipping', $fs_ok['tokens'] ) );
 
 		$fs_dup = $parser->parse( '{{free_shipping_threshold}} {{free_shipping_threshold}}' );
-		$this->assertSame( 'free_shipping_token_count', $rules->validate( 'woocommerce_free_shipping', $fs_dup['tokens'] ) );
+		$this->assertSame( 'free_shipping_token_count', $rules->validate_structure( $fs_dup['tokens'] ) );
 
 		$fs_none = $parser->parse( 'No token here' );
 		$this->assertSame( 'free_shipping_token_count', $rules->validate( 'woocommerce_free_shipping', $fs_none['tokens'] ) );
 
 		$dup_product = $parser->parse( '{{free_shipping_threshold}} {{product:1}} {{product:1}}' );
-		$this->assertNull( $rules->validate( 'woocommerce_free_shipping', $dup_product['tokens'] ) );
+		$this->assertNull( $rules->validate_structure( $dup_product['tokens'] ) );
 	}
 }

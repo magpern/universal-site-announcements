@@ -1,6 +1,6 @@
 <?php
 /**
- * Source-scoped token allowlists.
+ * Token allowlists and cardinality rules.
  *
  * @package UniversalSiteAnnouncements
  */
@@ -12,7 +12,7 @@ namespace USA\Template;
 use USA\Provider\WooCommerceFreeShippingProvider;
 
 /**
- * Enforces which merge tags are allowed per announcement source.
+ * Enforces merge-tag structure and (legacy) source-scoped cardinality.
  */
 final class SourceTokenRules {
 
@@ -21,13 +21,14 @@ final class SourceTokenRules {
 	public const TOKEN_PRODUCT = 'product';
 
 	/**
-	 * Validate parsed tokens against the source allowlist / cardinality rules.
+	 * Validate token structure independent of persisted source.
 	 *
-	 * @param string       $source Announcement source.
+	 * Allows zero or one free-shipping threshold token. Duplicates / unknowns fail.
+	 *
 	 * @param MergeToken[] $tokens Parsed tokens.
 	 * @return string|null Null when valid; reason code when invalid.
 	 */
-	public function validate( string $source, array $tokens ): ?string {
+	public function validate_structure( array $tokens ): ?string {
 		$threshold_count = 0;
 
 		foreach ( $tokens as $token ) {
@@ -36,8 +37,8 @@ final class SourceTokenRules {
 					return 'invalid_token_argument';
 				}
 				++$threshold_count;
-				if ( WooCommerceFreeShippingProvider::SOURCE !== $source ) {
-					return 'free_shipping_token_forbidden';
+				if ( $threshold_count > 1 ) {
+					return 'free_shipping_token_count';
 				}
 				continue;
 			}
@@ -52,26 +53,72 @@ final class SourceTokenRules {
 			return 'unknown_token';
 		}
 
+		return null;
+	}
+
+	/**
+	 * Whether validated tokens require the free-shipping path.
+	 *
+	 * @param MergeToken[] $tokens Parsed tokens (must already pass validate_structure).
+	 */
+	public function requires_free_shipping( array $tokens ): bool {
+		foreach ( $tokens as $token ) {
+			if ( self::TOKEN_FREE_SHIPPING === $token->name ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Validate parsed tokens against a derived or legacy source.
+	 *
+	 * @param string       $source Announcement source.
+	 * @param MergeToken[] $tokens Parsed tokens.
+	 * @return string|null Null when valid; reason code when invalid.
+	 */
+	public function validate( string $source, array $tokens ): ?string {
+		$structure = $this->validate_structure( $tokens );
+		if ( null !== $structure ) {
+			return $structure;
+		}
+
+		$threshold_count = 0;
+		foreach ( $tokens as $token ) {
+			if ( self::TOKEN_FREE_SHIPPING === $token->name ) {
+				++$threshold_count;
+			}
+		}
+
 		if ( WooCommerceFreeShippingProvider::SOURCE === $source ) {
 			if ( 1 !== $threshold_count ) {
 				return 'free_shipping_token_count';
 			}
+		} elseif ( $threshold_count > 0 ) {
+			return 'free_shipping_token_forbidden';
 		}
 
 		return null;
 	}
 
 	/**
-	 * Token names allowed for a source (for admin insert UI).
+	 * Token names insertable in the editor (no source choice required).
+	 *
+	 * @return list<string>
+	 */
+	public function insertable_names(): array {
+		return array( self::TOKEN_FREE_SHIPPING, self::TOKEN_PRODUCT );
+	}
+
+	/**
+	 * Token names allowed for a source (legacy helper).
 	 *
 	 * @param string $source Source.
 	 * @return list<string>
 	 */
 	public function allowed_names( string $source ): array {
-		if ( WooCommerceFreeShippingProvider::SOURCE === $source ) {
-			return array( self::TOKEN_FREE_SHIPPING, self::TOKEN_PRODUCT );
-		}
-		return array( self::TOKEN_PRODUCT );
+		unset( $source );
+		return $this->insertable_names();
 	}
 
 	/**

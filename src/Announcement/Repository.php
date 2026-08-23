@@ -69,8 +69,7 @@ final class Repository {
 	/**
 	 * Ordered active announcement contents (priority ASC, ID ASC).
 	 *
-	 * Considers publish + enabled + schedule + source resolution.
-	 * Empty schedule = always on. Provider rows omit themselves when suppressed.
+	 * Considers publish + enabled + schedule + derived template requirements.
 	 *
 	 * @return list<array{id:int,priority:int,content:string,source:string}>
 	 */
@@ -85,7 +84,10 @@ final class Repository {
 			)
 		);
 
-		$rows = array();
+		$rows             = array();
+		$pending          = array();
+		$fs_candidate_ids = array();
+
 		foreach ( $posts as $post ) {
 			$enabled = get_post_meta( $post->ID, '_usa_enabled', true );
 			if ( '1' !== (string) $enabled && 'yes' !== (string) $enabled && true !== $enabled ) {
@@ -100,13 +102,37 @@ final class Repository {
 				continue;
 			}
 
-			$source = (string) get_post_meta( $post->ID, '_usa_source', true );
-			if ( '' === $source ) {
-				$source = 'manual';
+			$analysis = $this->engine->requirements()->analyse( (string) $post->post_content );
+			if ( ! $analysis['ok'] ) {
+				DiagnosticsNotice::record_failure( 'template_' . $analysis['reason'] );
+				continue;
 			}
 
+			if ( $analysis['requires_free_shipping'] ) {
+				$fs_candidate_ids[] = (int) $post->ID;
+			}
+
+			$pending[] = array(
+				'post'     => $post,
+				'analysis' => $analysis,
+			);
+		}
+
+		$suppress_fs = count( $fs_candidate_ids ) > 1;
+		if ( $suppress_fs ) {
+			DiagnosticsNotice::record_failure( 'duplicate_free_shipping_announcements' );
+		}
+
+		foreach ( $pending as $item ) {
+			$post     = $item['post'];
+			$analysis = $item['analysis'];
+			if ( $suppress_fs && $analysis['requires_free_shipping'] ) {
+				continue;
+			}
+
+			$source   = $analysis['derived_source'];
 			$priority = $this->read_priority( (int) $post->ID );
-			$content  = $this->resolve_content( $post, $source );
+			$content  = $this->resolve_content( $post, $source, $analysis );
 			if ( null === $content || '' === $content ) {
 				continue;
 			}
@@ -135,11 +161,22 @@ final class Repository {
 	/**
 	 * Resolve rendered HTML for one announcement, or null when suppressed.
 	 *
-	 * @param \WP_Post $post   Post.
-	 * @param string   $source Source key.
+	 * @param \WP_Post                                                              $post     Post.
+	 * @param string                                                                $source   Derived source.
+	 * @param array{ok:bool,requires_free_shipping:bool,derived_source:string}|null $analysis Optional precomputed analysis.
 	 */
-	public function resolve_content( $post, string $source ): ?string {
+	public function resolve_content( $post, string $source = '', ?array $analysis = null ): ?string {
 		$template = (string) $post->post_content;
+
+		if ( null === $analysis ) {
+			$analysis = $this->engine->requirements()->analyse( $template );
+		}
+		if ( ! $analysis['ok'] ) {
+			DiagnosticsNotice::record_failure( 'template_' . $analysis['reason'] );
+			return null;
+		}
+
+		$source = $analysis['derived_source'];
 
 		if ( WooCommerceFreeShippingProvider::SOURCE === $source ) {
 			if ( null === $this->provider ) {
@@ -153,12 +190,6 @@ final class Repository {
 				if ( '' !== $reason ) {
 					DiagnosticsNotice::record_failure( 'fs_' . $reason );
 				}
-				return null;
-			}
-
-			$inspect = $this->engine->inspect( $template, $source );
-			if ( ! $inspect['ok'] ) {
-				DiagnosticsNotice::record_failure( 'template_' . $inspect['reason'] );
 				return null;
 			}
 
@@ -185,11 +216,8 @@ final class Repository {
 			return $rendered;
 		}
 
-		// Manual: static HTML and/or product tokens.
 		$rendered = $this->engine->render( $template, 'manual', array() );
 		if ( null === $rendered ) {
-			// Templates with no tokens that fail rules shouldn't happen for empty-token
-			// valid manuals — but malformed tokens suppress.
 			if ( '' !== $this->engine->last_reason() ) {
 				DiagnosticsNotice::record_failure( 'template_' . $this->engine->last_reason() );
 			}

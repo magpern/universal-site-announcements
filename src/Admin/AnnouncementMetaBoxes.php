@@ -77,7 +77,7 @@ final class AnnouncementMetaBoxes {
 	 */
 	public function register(): void {
 		add_action( 'add_meta_boxes', array( $this, 'add_boxes' ) );
-		add_action( 'edit_form_after_title', array( $this, 'render_source_selector' ) );
+		add_action( 'edit_form_after_title', array( $this, 'render_requirements_status' ) );
 		add_action( 'save_post_' . PostType::POST_TYPE, array( $this, 'save' ), 10, 2 );
 		add_filter( 'content_save_pre', array( $this, 'sanitize_content_on_save' ), 10, 1 );
 		add_action( 'admin_notices', array( $this, 'render_admin_errors' ) );
@@ -125,38 +125,38 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
-	 * Prominent source selector above the content editor.
+	 * Read-only dynamic requirements status above the content editor.
 	 *
 	 * @param \WP_Post $post Post.
 	 */
-	public function render_source_selector( $post ): void {
+	public function render_requirements_status( $post ): void {
 		if ( ! $post instanceof \WP_Post || PostType::POST_TYPE !== $post->post_type ) {
 			return;
 		}
 
-		$source = (string) get_post_meta( $post->ID, '_usa_source', true );
-		if ( '' === $source ) {
-			$source = 'manual';
+		$analysis = $this->engine->inspect( (string) $post->post_content );
+		$label    = $this->engine->requirements()->status_label(
+			$analysis,
+			array( $this, 'humanize_reason' )
+		);
+		$css      = 'notice-info';
+		if ( ! $analysis['ok'] ) {
+			$css = 'notice-error';
+		} elseif ( ! empty( $analysis['requires_free_shipping'] ) ) {
+			$css = 'notice-warning';
 		}
 
 		wp_nonce_field( 'usa_announcement_meta', 'usa_announcement_meta_nonce' );
 		?>
-		<div class="usa-source-selector notice notice-info inline" style="padding:12px 16px;margin:12px 0;">
-			<p style="margin:0 0 8px;font-weight:600;">
-				<?php echo esc_html__( 'Announcement source', 'universal-site-announcements' ); ?>
+		<div id="usa-dynamic-requirements" class="usa-dynamic-requirements notice <?php echo esc_attr( $css ); ?> inline" style="padding:12px 16px;margin:12px 0;" data-usa-requirements="1">
+			<p style="margin:0 0 4px;font-weight:600;">
+				<?php echo esc_html__( 'Dynamic requirements', 'universal-site-announcements' ); ?>
 			</p>
-			<p style="margin:0 0 8px;">
-				<label style="margin-right:16px;">
-					<input type="radio" name="usa_source" value="manual" <?php checked( $source, 'manual' ); ?> />
-					<?php echo esc_html__( 'Manual message', 'universal-site-announcements' ); ?>
-				</label>
-				<label>
-					<input type="radio" name="usa_source" value="<?php echo esc_attr( WooCommerceFreeShippingProvider::SOURCE ); ?>" <?php checked( $source, WooCommerceFreeShippingProvider::SOURCE ); ?> />
-					<?php echo esc_html__( 'WooCommerce free shipping', 'universal-site-announcements' ); ?>
-				</label>
+			<p id="usa-dynamic-requirements-status" style="margin:0;" data-status="<?php echo esc_attr( $analysis['ok'] ? ( $analysis['requires_free_shipping'] ? 'free_shipping' : 'none' ) : 'invalid' ); ?>">
+				<?php echo esc_html( $label ); ?>
 			</p>
-			<p class="description" style="margin:0;">
-				<?php echo esc_html__( 'Choose the source before editing the message. Dynamic values available in the editor depend on this selection.', 'universal-site-announcements' ); ?>
+			<p class="description" style="margin:8px 0 0;">
+				<?php echo esc_html__( 'Requirements are determined automatically from the message template. Insert a free shipping threshold or product link using Dynamic values — no source selection is required.', 'universal-site-announcements' ); ?>
 			</p>
 		</div>
 		<?php
@@ -296,21 +296,16 @@ final class AnnouncementMetaBoxes {
 	/**
 	 * Insert dynamic value controls.
 	 *
-	 * @param \WP_Post $post Post.
-	 */
-	/**
-	 * Insert dynamic value controls.
-	 *
 	 * @param \WP_Post $post Post (unused; metabox signature).
 	 */
 	public function render_tokens_box( $post ): void {
 		unset( $post );
 		?>
 		<p class="description">
-			<?php echo esc_html__( 'Insert a dynamic value at the cursor in the content editor. Only values allowed for the selected source are shown.', 'universal-site-announcements' ); ?>
+			<?php echo esc_html__( 'Insert a dynamic value at the cursor in the content editor. Requirements update automatically from the template.', 'universal-site-announcements' ); ?>
 		</p>
 		<p class="usa-token-buttons">
-			<button type="button" class="button usa-insert-token" data-token="{{free_shipping_threshold}}" data-requires-source="woocommerce_free_shipping">
+			<button type="button" class="button usa-insert-token" data-token="{{free_shipping_threshold}}">
 				<?php echo esc_html__( 'Free shipping threshold', 'universal-site-announcements' ); ?>
 			</button>
 			<button type="button" class="button usa-insert-product" id="usa-insert-product">
@@ -325,7 +320,7 @@ final class AnnouncementMetaBoxes {
 		<p class="description">
 			<code>{{free_shipping_threshold}}</code>
 			—
-			<?php echo esc_html__( 'Required exactly once for free-shipping source.', 'universal-site-announcements' ); ?>
+			<?php echo esc_html__( 'Makes this announcement depend on WooCommerce free shipping (exactly one allowed).', 'universal-site-announcements' ); ?>
 			<br />
 			<code>{{product:123}}</code>
 			—
@@ -340,13 +335,9 @@ final class AnnouncementMetaBoxes {
 	 * @param \WP_Post $post Post.
 	 */
 	public function render_preview_box( $post ): void {
-		$source = (string) get_post_meta( $post->ID, '_usa_source', true );
-		if ( '' === $source ) {
-			$source = 'manual';
-		}
 		$template = (string) $post->post_content;
-
-		$inspect = $this->engine->inspect( $template, $source );
+		$inspect  = $this->engine->inspect( $template );
+		$source   = $inspect['derived_source'];
 
 		echo '<p class="description">' . esc_html__(
 			'Promotional wording (for example “Buy 2… get one free”) is editorial. This plugin resolves product names and links only; it does not verify promotion configuration.',
@@ -374,7 +365,7 @@ final class AnnouncementMetaBoxes {
 		}
 
 		$context = array();
-		if ( WooCommerceFreeShippingProvider::SOURCE === $source && null !== $this->provider ) {
+		if ( ! empty( $inspect['requires_free_shipping'] ) && null !== $this->provider ) {
 			$base = $this->provider->resolve_base_threshold();
 			if ( null === $base ) {
 				printf(
@@ -421,25 +412,26 @@ final class AnnouncementMetaBoxes {
 	 * @param \WP_Post $post Post.
 	 */
 	public function render_diagnostics_box( $post ): void {
-		$source = (string) get_post_meta( $post->ID, '_usa_source', true );
-		if ( WooCommerceFreeShippingProvider::SOURCE !== $source ) {
-			echo '<p class="description">' . esc_html__( 'Diagnostics appear when Source is WooCommerce free shipping.', 'universal-site-announcements' ) . '</p>';
+		$inspect = $this->engine->inspect( (string) $post->post_content );
+		$show    = ! $inspect['ok'] || ! empty( $inspect['requires_free_shipping'] );
+		if ( ! $show ) {
+			echo '<p class="description">' . esc_html__( 'Free shipping diagnostics appear when the template requires free shipping or is invalid.', 'universal-site-announcements' ) . '</p>';
 			return;
 		}
 
-		if ( null === $this->provider ) {
-			echo '<p>' . esc_html__( 'Provider unavailable.', 'universal-site-announcements' ) . '</p>';
+		if ( ! empty( $inspect['requires_free_shipping'] ) && null === $this->provider ) {
+			echo '<p>' . esc_html__( 'Free shipping provider unavailable.', 'universal-site-announcements' ) . '</p>';
 			return;
 		}
 
-		$diag     = $this->provider->diagnose();
-		$inspect  = $this->engine->inspect( (string) $post->post_content, $source );
+		$diag     = ( null !== $this->provider ) ? $this->provider->diagnose() : array();
 		$template = '' !== trim( (string) $post->post_content )
 			? (string) $post->post_content
 			: Schema::DEFAULT_FREE_SHIPPING_TEMPLATE;
 
 		echo '<table class="widefat striped"><tbody>';
 		$rows = array(
+			__( 'Dynamic requirements', 'universal-site-announcements' ) => $this->engine->requirements()->status_label( $inspect, array( $this, 'humanize_reason' ) ),
 			__( 'Reference country', 'universal-site-announcements' ) => (string) ( $diag['reference_country'] ?? '' ),
 			__( 'Zone', 'universal-site-announcements' )   => (string) ( $diag['zone_name'] ?? '' ),
 			__( 'Method', 'universal-site-announcements' ) => (string) ( $diag['method_id'] ?? '' ),
@@ -486,38 +478,39 @@ final class AnnouncementMetaBoxes {
 		}
 
 		$enabled = isset( $_POST['usa_enabled'] ) ? '1' : '0';
-		$source  = isset( $_POST['usa_source'] ) ? sanitize_key( wp_unslash( $_POST['usa_source'] ) ) : 'manual';
-		if ( WooCommerceFreeShippingProvider::SOURCE !== $source ) {
-			$source = 'manual';
-		}
 
-		if ( WooCommerceFreeShippingProvider::SOURCE === $source && '1' === $enabled ) {
-			if ( $this->has_other_enabled_provider( $post_id ) ) {
+		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( ! is_string( $content ) ) {
+			$content = '';
+		}
+		$content  = $this->sanitizer->sanitize( $content );
+		$analysis = $this->engine->inspect( $content );
+		$source   = $analysis['ok'] ? $analysis['derived_source'] : 'manual';
+
+		if ( $analysis['ok'] && ! empty( $analysis['requires_free_shipping'] ) && '1' === $enabled ) {
+			if ( $this->has_other_enabled_free_shipping_dependent( $post_id ) ) {
 				$this->queue_error(
-					__( 'Only one enabled WooCommerce free shipping announcement is allowed.', 'universal-site-announcements' )
+					__( 'Only one enabled announcement that requires WooCommerce free shipping is allowed. Disable the other free-shipping message first, or remove {{free_shipping_threshold}} from this template.', 'universal-site-announcements' )
 				);
 				return;
 			}
 		}
 
-		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		if ( is_string( $content ) ) {
-			$content = $this->sanitizer->sanitize( $content );
-			$inspect = $this->engine->inspect( $content, $source );
-			if ( ! $inspect['ok'] ) {
-				$this->queue_error(
-					sprintf(
-						/* translators: %s: validation reason */
-						__( 'Invalid announcement template: %s', 'universal-site-announcements' ),
-						$this->humanize_reason( $inspect['reason'] )
-					)
-				);
-				// Still persist source/settings; front-end will suppress until fixed.
-			}
+		if ( ! $analysis['ok'] ) {
+			$this->queue_error(
+				sprintf(
+					/* translators: %s: validation reason */
+					__( 'Invalid announcement template: %s', 'universal-site-announcements' ),
+					$this->humanize_reason( $analysis['reason'] )
+				)
+			);
+			// Still persist settings; front-end will suppress until fixed. Sync legacy source only when valid.
 		}
 
 		update_post_meta( $post_id, '_usa_enabled', $enabled );
-		update_post_meta( $post_id, '_usa_source', $source );
+		if ( $analysis['ok'] ) {
+			update_post_meta( $post_id, '_usa_source', $source );
+		}
 
 		if ( isset( $_POST['usa_priority'] ) ) {
 			$raw = sanitize_text_field( wp_unslash( $_POST['usa_priority'] ) );
@@ -660,7 +653,7 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
-	 * Notice when editing an invalid legacy free-shipping template.
+	 * Notice when editing an invalid template.
 	 */
 	public function render_invalid_template_notice(): void {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
@@ -676,11 +669,6 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$source = (string) get_post_meta( $post_id, '_usa_source', true );
-		if ( WooCommerceFreeShippingProvider::SOURCE !== $source ) {
-			return;
-		}
-
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			return;
@@ -691,7 +679,7 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$inspect = $this->engine->inspect( $content, $source );
+		$inspect = $this->engine->inspect( $content );
 		if ( $inspect['ok'] ) {
 			return;
 		}
@@ -701,7 +689,7 @@ final class AnnouncementMetaBoxes {
 			esc_html(
 				sprintf(
 					/* translators: %s: reason */
-					__( 'This free-shipping announcement has an invalid template and will be suppressed on the front end until corrected: %s', 'universal-site-announcements' ),
+					__( 'This announcement has an invalid template and will be suppressed on the front end until corrected: %s', 'universal-site-announcements' ),
 					$this->humanize_reason( $inspect['reason'] )
 				)
 			)
@@ -722,7 +710,7 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.4.0';
+		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.4.1';
 		$js      = USA_PLUGIN_DIR . 'assets/js/announcement-editor.js';
 		$url     = plugins_url( 'assets/js/announcement-editor.js', USA_PLUGIN_FILE );
 
@@ -741,8 +729,11 @@ final class AnnouncementMetaBoxes {
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'usa_search_products' ),
 				'i18n'    => array(
-					'noResults' => __( 'No products found.', 'universal-site-announcements' ),
-					'searching' => __( 'Searching…', 'universal-site-announcements' ),
+					'noResults'   => __( 'No products found.', 'universal-site-announcements' ),
+					'searching'   => __( 'Searching…', 'universal-site-announcements' ),
+					'reqNone'     => __( 'No special requirements', 'universal-site-announcements' ),
+					'reqShipping' => __( 'Requires WooCommerce free shipping', 'universal-site-announcements' ),
+					'reqInvalid'  => __( 'Template is invalid — check merge tags and placement.', 'universal-site-announcements' ),
 				),
 			)
 		);
@@ -787,33 +778,32 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
-	 * Whether another enabled free-shipping provider announcement exists.
+	 * Whether another enabled free-shipping-dependent announcement exists (derived from template).
 	 *
 	 * @param int $post_id Current post ID.
 	 */
-	private function has_other_enabled_provider( int $post_id ): bool {
+	private function has_other_enabled_free_shipping_dependent( int $post_id ): bool {
 		$posts = get_posts(
 			array(
 				'post_type'      => PostType::POST_TYPE,
 				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
-				'posts_per_page' => 1,
+				'posts_per_page' => -1,
 				'post__not_in'   => array( $post_id ),
-				'fields'         => 'ids',
-				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-					'relation' => 'AND',
-					array(
-						'key'   => '_usa_source',
-						'value' => WooCommerceFreeShippingProvider::SOURCE,
-					),
-					array(
-						'key'   => '_usa_enabled',
-						'value' => '1',
-					),
-				),
 			)
 		);
 
-		return array() !== $posts;
+		foreach ( $posts as $post ) {
+			$enabled = get_post_meta( $post->ID, '_usa_enabled', true );
+			if ( '1' !== (string) $enabled && 'yes' !== (string) $enabled ) {
+				continue;
+			}
+			$analysis = $this->engine->inspect( (string) $post->post_content );
+			if ( $analysis['ok'] && ! empty( $analysis['requires_free_shipping'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -835,14 +825,14 @@ final class AnnouncementMetaBoxes {
 	 *
 	 * @param string $reason Machine reason.
 	 */
-	private function humanize_reason( string $reason ): string {
+	public function humanize_reason( string $reason ): string {
 		$map = array(
 			'malformed_merge_tags'          => __( 'Malformed merge tags (unmatched or invalid {{…}}).', 'universal-site-announcements' ),
 			'token_in_attribute'            => __( 'Merge tags are not allowed inside HTML attributes.', 'universal-site-announcements' ),
 			'product_token_inside_anchor'   => __( 'Product tokens cannot appear inside an existing link.', 'universal-site-announcements' ),
 			'token_not_in_text_node'        => __( 'Merge tags must appear in text content.', 'universal-site-announcements' ),
 			'free_shipping_token_forbidden' => __( 'Free-shipping threshold tokens are not allowed on manual announcements.', 'universal-site-announcements' ),
-			'free_shipping_token_count'     => __( 'Free-shipping announcements require exactly one {{free_shipping_threshold}} token.', 'universal-site-announcements' ),
+			'free_shipping_token_count'     => __( 'Use exactly one {{free_shipping_threshold}} token (duplicates are not allowed).', 'universal-site-announcements' ),
 			'unknown_token'                 => __( 'Unknown merge tag.', 'universal-site-announcements' ),
 			'invalid_product_token'         => __( 'Invalid product token (use a positive numeric ID).', 'universal-site-announcements' ),
 			'invalid_token_argument'        => __( 'Invalid token argument.', 'universal-site-announcements' ),
