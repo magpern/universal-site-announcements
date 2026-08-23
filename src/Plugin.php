@@ -11,6 +11,7 @@ namespace USA;
 
 use USA\Admin\AnnouncementMetaBoxes;
 use USA\Admin\DiagnosticsNotice;
+use USA\Admin\PluginActionLinks;
 use USA\Admin\SettingsPage;
 use USA\Announcement\ListTable;
 use USA\Announcement\PostType;
@@ -63,6 +64,7 @@ final class Plugin {
 
 		( new PostType() )->register();
 		( new SettingsPage() )->register();
+		( new PluginActionLinks() )->register();
 		( new AnnouncementMetaBoxes( $sanitizer, $schedule, $provider ) )->register();
 		( new ListTable( $schedule ) )->register();
 		( new DiagnosticsNotice() )->register();

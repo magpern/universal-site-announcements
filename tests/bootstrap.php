@@ -115,3 +115,66 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 		return 0;
 	}
 }
+
+if ( ! function_exists( 'get_option' ) ) {
+	/**
+	 * @param string $key     Option key.
+	 * @param mixed  $default Default.
+	 * @return mixed
+	 */
+	function get_option( $key, $default = false ) {
+		if ( isset( $GLOBALS['usa_test_options'] ) && is_array( $GLOBALS['usa_test_options'] ) && array_key_exists( $key, $GLOBALS['usa_test_options'] ) ) {
+			return $GLOBALS['usa_test_options'][ $key ];
+		}
+		return $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	/**
+	 * @param string $key   Option key.
+	 * @param mixed  $value Value.
+	 * @param mixed  $autoload Autoload (ignored).
+	 */
+	function update_option( $key, $value, $autoload = null ): bool {
+		unset( $autoload );
+		if ( ! isset( $GLOBALS['usa_test_options'] ) || ! is_array( $GLOBALS['usa_test_options'] ) ) {
+			$GLOBALS['usa_test_options'] = array();
+		}
+		$GLOBALS['usa_test_options'][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	/**
+	 * @param string $path Path.
+	 */
+	function admin_url( $path = '' ): string {
+		return 'https://example.test/wp-admin/' . ltrim( (string) $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	/**
+	 * @param string $cap Capability.
+	 */
+	function current_user_can( $cap ): bool {
+		unset( $cap );
+		return ! empty( $GLOBALS['usa_test_current_user_can'] );
+	}
+}
+
+if ( ! function_exists( 'esc_url' ) ) {
+	/**
+	 * @param string $url URL.
+	 */
+	function esc_url( $url ): string {
+		return (string) $url;
+	}
+}
+
+if ( ! defined( 'USA_PLUGIN_BASENAME' ) ) {
+	define( 'USA_PLUGIN_BASENAME', 'universal-site-announcements/universal-site-announcements.php' );
+}
+
