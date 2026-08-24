@@ -72,6 +72,13 @@ final class DiagnosticsNotice {
 	 * @param string $code Failure code.
 	 */
 	private function message_for_code( string $code ): string {
+		if ( 'overlay_token_signature_mismatch' === $code ) {
+			return __(
+				'Universal Site Announcements fell back to the source announcement template because a translation changed protected merge tags. Edit the translation so tokens match the source exactly.',
+				'universal-site-announcements'
+			);
+		}
+
 		if ( 0 === strpos( $code, 'duplicate_free_shipping' ) ) {
 			return __(
 				'Universal Site Announcements suppressed free-shipping announcements because more than one enabled free-shipping-dependent message was active. Keep only one announcement that uses {{free_shipping_threshold}}.',

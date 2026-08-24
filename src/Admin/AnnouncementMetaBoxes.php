@@ -12,6 +12,7 @@ namespace USA\Admin;
 use USA\Announcement\PostType;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
+use USA\Integration\AimlCompatibility;
 use USA\Lifecycle\Schema;
 use USA\Provider\WooCommerceFreeShippingProvider;
 use USA\Settings;
@@ -53,23 +54,40 @@ final class AnnouncementMetaBoxes {
 	private TemplateEngine $engine;
 
 	/**
+	 * AIML compatibility probe.
+	 *
+	 * @var AimlCompatibility
+	 */
+	private AimlCompatibility $aiml_compatibility;
+
+	/**
+	 * Previous post_content snapshots keyed by post ID.
+	 *
+	 * @var array<int, string>
+	 */
+	private array $previous_content = array();
+
+	/**
 	 * Constructor.
 	 *
-	 * @param Sanitizer                            $sanitizer Content sanitiser.
-	 * @param ScheduleEvaluator                    $schedule  Schedule helper.
-	 * @param WooCommerceFreeShippingProvider|null $provider  Provider for diagnostics.
-	 * @param TemplateEngine                       $engine    Template engine.
+	 * @param Sanitizer                            $sanitizer          Content sanitiser.
+	 * @param ScheduleEvaluator                    $schedule           Schedule helper.
+	 * @param WooCommerceFreeShippingProvider|null $provider           Provider for diagnostics.
+	 * @param TemplateEngine                       $engine             Template engine.
+	 * @param AimlCompatibility|null               $aiml_compatibility AIML probe (optional for tests).
 	 */
 	public function __construct(
 		Sanitizer $sanitizer,
 		ScheduleEvaluator $schedule,
 		?WooCommerceFreeShippingProvider $provider,
-		TemplateEngine $engine
+		TemplateEngine $engine,
+		?AimlCompatibility $aiml_compatibility = null
 	) {
-		$this->sanitizer = $sanitizer;
-		$this->schedule  = $schedule;
-		$this->provider  = $provider;
-		$this->engine    = $engine;
+		$this->sanitizer          = $sanitizer;
+		$this->schedule           = $schedule;
+		$this->provider           = $provider;
+		$this->engine             = $engine;
+		$this->aiml_compatibility = $aiml_compatibility ?? new AimlCompatibility();
 	}
 
 	/**
@@ -78,12 +96,68 @@ final class AnnouncementMetaBoxes {
 	public function register(): void {
 		add_action( 'add_meta_boxes', array( $this, 'add_boxes' ) );
 		add_action( 'edit_form_after_title', array( $this, 'render_requirements_status' ) );
+		add_action( 'pre_post_update', array( $this, 'capture_previous_content' ), 10, 2 );
 		add_action( 'save_post_' . PostType::POST_TYPE, array( $this, 'save' ), 10, 2 );
+		add_action( 'save_post_' . PostType::POST_TYPE, array( $this, 'maybe_mark_aiml_dirty' ), 20, 2 );
 		add_filter( 'content_save_pre', array( $this, 'sanitize_content_on_save' ), 10, 1 );
 		add_action( 'admin_notices', array( $this, 'render_admin_errors' ) );
 		add_action( 'admin_notices', array( $this, 'render_invalid_template_notice' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_editor_assets' ) );
 		add_action( 'wp_ajax_usa_search_products', array( $this, 'ajax_search_products' ) );
+	}
+
+	/**
+	 * Snapshot prior body before WP persists the new post_content.
+	 *
+	 * @param int                $post_id Post ID.
+	 * @param array<string,mixed> $data    Incoming post data.
+	 */
+	public function capture_previous_content( int $post_id, array $data ): void {
+		unset( $data );
+		if ( PostType::POST_TYPE !== get_post_type( $post_id ) ) {
+			return;
+		}
+		$post = get_post( $post_id );
+		if ( $post instanceof \WP_Post ) {
+			$this->previous_content[ $post_id ] = (string) $post->post_content;
+		}
+	}
+
+	/**
+	 * Mark AIML dirty only when announcement body actually changed.
+	 *
+	 * @param int      $post_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 */
+	public function maybe_mark_aiml_dirty( int $post_id, $post ): void {
+		unset( $post );
+
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( function_exists( 'wp_is_post_revision' ) && wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+		if ( ! $this->aiml_compatibility->is_compatible() || ! function_exists( 'aiml_mark_source_dirty' ) ) {
+			unset( $this->previous_content[ $post_id ] );
+			return;
+		}
+
+		$previous = $this->previous_content[ $post_id ] ?? null;
+		unset( $this->previous_content[ $post_id ] );
+		if ( null === $previous ) {
+			return;
+		}
+
+		$current = get_post( $post_id );
+		if ( ! $current instanceof \WP_Post ) {
+			return;
+		}
+		if ( (string) $current->post_content === $previous ) {
+			return;
+		}
+
+		aiml_mark_source_dirty( 'post', $post_id );
 	}
 
 	/**
@@ -710,7 +784,7 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.4.1';
+		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.5.0';
 		$js      = USA_PLUGIN_DIR . 'assets/js/announcement-editor.js';
 		$url     = plugins_url( 'assets/js/announcement-editor.js', USA_PLUGIN_FILE );
 
