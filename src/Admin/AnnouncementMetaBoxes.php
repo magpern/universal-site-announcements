@@ -784,7 +784,7 @@ final class AnnouncementMetaBoxes {
 			return;
 		}
 
-		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.5.0';
+		$version = defined( 'USA_VERSION' ) ? USA_VERSION : '0.5.1';
 		$js      = USA_PLUGIN_DIR . 'assets/js/announcement-editor.js';
 		$url     = plugins_url( 'assets/js/announcement-editor.js', USA_PLUGIN_FILE );
 

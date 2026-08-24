@@ -100,19 +100,23 @@ final class TemplateOverlay {
 			return $source_template;
 		}
 
-		$overlay = $resolved->text;
+		$overlay          = $resolved->text;
 		$source_analysis  = $this->requirements->analyse( $source_template );
 		$overlay_analysis = $this->requirements->analyse( $overlay );
 
 		if ( ! $overlay_analysis['ok'] ) {
-			DiagnosticsNotice::record_failure( 'template_' . $overlay_analysis['reason'] );
+			DiagnosticsNotice::record_failure( 'template_' . $overlay_analysis['reason'], $post_id );
 			return $source_template;
 		}
 
 		if ( ! self::token_signature_matches( $source_analysis['token_list'], $overlay_analysis['token_list'] ) ) {
-			DiagnosticsNotice::record_failure( 'overlay_token_signature_mismatch' );
+			DiagnosticsNotice::record_failure( DiagnosticsNotice::CODE_OVERLAY_TOKEN_SIGNATURE_MISMATCH, $post_id );
 			return $source_template;
 		}
+
+		DiagnosticsNotice::clear_if_recovered( DiagnosticsNotice::CODE_OVERLAY_TOKEN_SIGNATURE_MISMATCH, $post_id );
+		// Overlay body is valid again — clear a prior overlay-template diagnostic for this same announcement only.
+		DiagnosticsNotice::clear_if_recovered_prefix( 'template_', $post_id );
 
 		return $overlay;
 	}
@@ -136,11 +140,11 @@ final class TemplateOverlay {
 	private static function signature_bag( array $tokens ): array {
 		$bag = array();
 		foreach ( $tokens as $token ) {
-			$name = (string) ( $token['name'] ?? '' );
-			$arg  = array_key_exists( 'arg', $token ) && null !== $token['arg']
+			$name        = (string) ( $token['name'] ?? '' );
+			$arg         = array_key_exists( 'arg', $token ) && null !== $token['arg']
 				? (string) $token['arg']
 				: '';
-			$key  = $name . "\0" . $arg;
+			$key         = $name . "\0" . $arg;
 			$bag[ $key ] = ( $bag[ $key ] ?? 0 ) + 1;
 		}
 		ksort( $bag );
