@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace USA\Announcement;
 
 use USA\Admin\DiagnosticsNotice;
+use USA\Integration\TemplateOverlay;
 use USA\Provider\WooCommerceFreeShippingProvider;
 use USA\Template\TemplateEngine;
 
@@ -47,23 +48,33 @@ final class Repository {
 	private TemplateEngine $engine;
 
 	/**
+	 * Optional AIML template overlay.
+	 *
+	 * @var TemplateOverlay|null
+	 */
+	private ?TemplateOverlay $overlay;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Sanitizer                            $sanitizer Content sanitiser.
 	 * @param ScheduleEvaluator                    $schedule  Schedule evaluator.
 	 * @param TemplateEngine                       $engine    Template engine.
 	 * @param WooCommerceFreeShippingProvider|null $provider  Free-shipping provider.
+	 * @param TemplateOverlay|null                 $overlay   AIML overlay helper.
 	 */
 	public function __construct(
 		Sanitizer $sanitizer,
 		ScheduleEvaluator $schedule,
 		TemplateEngine $engine,
-		?WooCommerceFreeShippingProvider $provider = null
+		?WooCommerceFreeShippingProvider $provider = null,
+		?TemplateOverlay $overlay = null
 	) {
 		$this->sanitizer = $sanitizer;
 		$this->schedule  = $schedule;
 		$this->engine    = $engine;
 		$this->provider  = $provider;
+		$this->overlay   = $overlay;
 	}
 
 	/**
@@ -166,17 +177,21 @@ final class Repository {
 	 * @param array{ok:bool,requires_free_shipping:bool,derived_source:string}|null $analysis Optional precomputed analysis.
 	 */
 	public function resolve_content( $post, string $source = '', ?array $analysis = null ): ?string {
-		$template = (string) $post->post_content;
+		$source_template = (string) $post->post_content;
 
 		if ( null === $analysis ) {
-			$analysis = $this->engine->requirements()->analyse( $template );
+			$analysis = $this->engine->requirements()->analyse( $source_template );
 		}
 		if ( ! $analysis['ok'] ) {
 			DiagnosticsNotice::record_failure( 'template_' . $analysis['reason'] );
 			return null;
 		}
 
-		$source = $analysis['derived_source'];
+		// Source requirements remain authoritative; overlay may only change editorial body.
+		$source   = $analysis['derived_source'];
+		$template = null !== $this->overlay
+			? $this->overlay->apply( (int) $post->ID, $source_template )
+			: $source_template;
 
 		if ( WooCommerceFreeShippingProvider::SOURCE === $source ) {
 			if ( null === $this->provider ) {

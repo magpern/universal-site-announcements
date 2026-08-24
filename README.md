@@ -5,11 +5,13 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Text domain / slug:** `universal-site-announcements`  
 **PHP namespace:** `USA\`  
-**Version:** 0.4.1
+**Version:** 0.5.0
 
 ## Status
 
-**M1**–**M4** are implemented. **0.4.1** corrects announcement editor UX: dynamic requirements are derived from the template (no source radio).
+**M1**–**M4** are implemented. **0.5.0** adds optional AI Multilingual (AIML) template-body overlays for visitor-facing announcements when AIML ≥ 1.7.0 with public descriptor factory (1.8.0+) is available; source templates remain the fallback.
+
+**0.4.1** corrects announcement editor UX: dynamic requirements are derived from the template (no source radio).
 
 **0.4.0** adds schedule modes (always / one-time interval / weekly recurring) with optional weekly date windows in the WordPress site timezone.
 

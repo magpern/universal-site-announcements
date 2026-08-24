@@ -19,6 +19,9 @@ use USA\Announcement\Repository;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
 use USA\Announcement\Selector;
+use USA\Integration\AimlCompatibility;
+use USA\Integration\AimlIntegration;
+use USA\Integration\TemplateOverlay;
 use USA\Lifecycle\Schema;
 use USA\Provider\EligibilityGate;
 use USA\Provider\UmcActivity;
@@ -85,14 +88,30 @@ final class Plugin {
 			)
 		);
 
-		$repository = new Repository( $sanitizer, $schedule, $engine, $provider );
+		$aiml_compatibility = new AimlCompatibility();
+		$aiml_identity      = null;
+		if ( $aiml_compatibility->is_compatible() && class_exists( '\\AIMultilingual\\Integration\\Identity\\PluginIdentity' ) ) {
+			$aiml_identity = new \AIMultilingual\Integration\Identity\PluginIdentity();
+			add_action(
+				'aiml_register_integrations',
+				static function ( $registry ) use ( $aiml_identity, $aiml_compatibility ): void {
+					if ( ! is_object( $registry ) || ! method_exists( $registry, 'register' ) ) {
+						return;
+					}
+					$registry->register( new AimlIntegration( $aiml_identity, $aiml_compatibility ) );
+				}
+			);
+		}
+
+		$overlay    = new TemplateOverlay( $aiml_compatibility, $requirements, $aiml_identity );
+		$repository = new Repository( $sanitizer, $schedule, $engine, $provider, $overlay );
 		$selector   = new Selector( $repository );
 		$replacer   = new ContentReplacer();
 
 		( new PostType() )->register();
 		( new SettingsPage() )->register();
 		( new PluginActionLinks() )->register();
-		( new AnnouncementMetaBoxes( $sanitizer, $schedule, $provider, $engine ) )->register();
+		( new AnnouncementMetaBoxes( $sanitizer, $schedule, $provider, $engine, $aiml_compatibility ) )->register();
 		( new ListTable( $schedule, $requirements ) )->register();
 		( new DiagnosticsNotice() )->register();
 		( new StoreNoticeRenderer( $selector, $sanitizer, $replacer ) )->register();
