@@ -41,8 +41,8 @@ M5-B is a **single deliverable**: Integration registration, Workspace/Jobs extra
 | Gate | Status | Blocks |
 |------|--------|--------|
 | AIML M5-A on `main` (1.7.0) | Done (merge `8955a1b5f55ec77675715fc93eddf8de5ffc6933`) | — |
-| AIML extract API corrective release | **Not shipped** | **All USA M5-B implementation** |
-| M5-A + extract API merged, documented, feature-probe verified, installed on target dev environment | Partial (M5-A only) | DEV implementation verification |
+| AIML extract API corrective release (M5-A.1 / 1.8.0) | Done (merge `980e463b73a59901dd50fc12b198c7f1813b0546`) | — |
+| M5-A + extract API merged, documented, feature-probe verified, installed on target dev environment | Done (DEV bind-mount serves `AIML_VERSION=1.8.0`; probe confirmed `Contract::FORMAT_HTML` + `TranslationUnitDescriptor::from_source(...)`) | — |
 | Formal AIML GitHub tag/release | Pending | Production / ZIP-based deployment only |
 | This M5-B plan frozen | Done (this document) | — |
 
@@ -158,12 +158,17 @@ AIML does **not** flip CPT `public` / REST / rewrite / archives / permalinks.
 - Returns `null` when unavailable or too early (before request language context is established).
 - Does **not** read cookies, geo, or `Accept-Language`.
 
-### 4.3 Extract corrective API symbols (TBD by AIML release)
+### 4.3 Extract corrective API symbols (AIML 1.8.0 / M5-A.1)
 
-Once the corrective release ships, USA feature probe must verify (exact names per AIML docs):
+USA feature probe verifies:
 
-- Public HTML `text_format` constant
-- Public source-hash helper and/or `TranslationUnitDescriptor` factory
+| Probe | Purpose |
+|-------|---------|
+| `defined( \AIMultilingual\Integration\Contract::class . '::FORMAT_HTML' )` / `Contract::FORMAT_HTML` | Public HTML format constant |
+| `defined( \AIMultilingual\Integration\Contract::class . '::FORMAT_PLAIN' )` / `Contract::FORMAT_PLAIN` | Public plain format constant |
+| `method_exists( \AIMultilingual\Integration\TranslationUnitDescriptor::class, 'from_source' )` | Public descriptor factory |
+
+Do **not** import `AIMultilingual\Translation\Store`.
 
 ### 4.4 Explicit forbidden imports
 
@@ -224,12 +229,13 @@ A version string alone is **not** sufficient.
 | `function_exists( 'aiml_mark_source_dirty' )` | Public dirty helper |
 | `method_exists( \AIMultilingual\Extension\ExtensionServices::class, 'resolver' )` | Public resolver accessor |
 
-### 6.3 Extract corrective API probe (after corrective release)
+### 6.3 Extract corrective API probe (AIML 1.8.0)
 
 | Probe | Purpose |
 |-------|---------|
-| Public HTML format constant exists | Documented format vocabulary |
-| Public hash helper or descriptor factory exists | Valid `TranslationUnitDescriptor` construction without Store |
+| `Contract::FORMAT_HTML` exists | Documented HTML format vocabulary |
+| `Contract::FORMAT_PLAIN` exists | Documented plain format vocabulary |
+| `method_exists( TranslationUnitDescriptor::class, 'from_source' )` | Valid descriptor construction without Store |
 
 If **any** probe fails → treat AIML as incompatible: skip `aiml_register_integrations` registration; runtime overlay returns source-only.
 
@@ -469,8 +475,8 @@ flowchart TB
 
 1. **Done:** M5 parent plan frozen; M5-A implemented on AIML `main` (1.7.0).
 2. **Done:** This M5-B plan frozen (this document).
-3. **Next (AIML):** Generic extract API corrective release — documented public hash/format or descriptor factory.
-4. **Next (USA):** Implement M5-B adapter (expected **0.5.0**) after AIML prerequisites merged, documented, feature-probe verified, and installed on target dev environment.
+3. **Done:** AIML extract API corrective release (M5-A.1 / 1.8.0) — `Contract::FORMAT_*` + `TranslationUnitDescriptor::from_source(...)`; DEV feature probe green on bind-mount.
+4. **Next (USA):** Implement M5-B adapter (expected **0.5.0**) on target development environment.
 5. **Later:** Formal AIML + USA releases/tags for production/ZIP deploy.
 
 ---
@@ -479,9 +485,8 @@ flowchart TB
 
 | Decision | Notes |
 |----------|-------|
-| Authorize AIML extract API corrective release | Hard prerequisite — separate AIML task |
-| Authorize formal AIML GitHub releases (M5-A + corrective) | Required before production/ZIP deploy only |
-| Authorize USA 0.5.0 implementation | After AIML prerequisites satisfied on target dev environment |
+| Authorize formal AIML GitHub releases (M5-A + M5-A.1) | Required before production/ZIP deploy only |
+| Authorize USA 0.5.0 implementation | Unblocked — AIML prerequisites satisfied on target DEV |
 
 Identity constants are locked (§5). This plan document is frozen.
 
