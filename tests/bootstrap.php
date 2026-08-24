@@ -323,3 +323,52 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 	}
 }
 
+/**
+ * @var array<string, mixed>
+ */
+$GLOBALS['usa_test_transients'] = array();
+
+if ( ! function_exists( 'get_transient' ) ) {
+	/**
+	 * @param string $key Transient key.
+	 * @return mixed
+	 */
+	function get_transient( $key ) {
+		if ( ! isset( $GLOBALS['usa_test_transients'] ) || ! is_array( $GLOBALS['usa_test_transients'] ) ) {
+			return false;
+		}
+		return array_key_exists( (string) $key, $GLOBALS['usa_test_transients'] )
+			? $GLOBALS['usa_test_transients'][ (string) $key ]
+			: false;
+	}
+}
+
+if ( ! function_exists( 'set_transient' ) ) {
+	/**
+	 * @param string $key        Transient key.
+	 * @param mixed  $value      Value.
+	 * @param int    $expiration Expiration.
+	 */
+	function set_transient( $key, $value, $expiration = 0 ): bool {
+		unset( $expiration );
+		if ( ! isset( $GLOBALS['usa_test_transients'] ) || ! is_array( $GLOBALS['usa_test_transients'] ) ) {
+			$GLOBALS['usa_test_transients'] = array();
+		}
+		$GLOBALS['usa_test_transients'][ (string) $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	/**
+	 * @param string $key Transient key.
+	 */
+	function delete_transient( $key ): bool {
+		if ( ! isset( $GLOBALS['usa_test_transients'] ) || ! is_array( $GLOBALS['usa_test_transients'] ) ) {
+			return true;
+		}
+		unset( $GLOBALS['usa_test_transients'][ (string) $key ] );
+		return true;
+	}
+}
+
