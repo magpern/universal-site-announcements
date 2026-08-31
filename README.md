@@ -11,7 +11,7 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 
 **M1**–**M5** are implemented. **0.5.1** makes render diagnostics dismissible and auto-clears overlay merge-tag mismatch warnings only when the same announcement recovers.
 
-**0.5.0** adds optional AI Multilingual (AIML) template-body overlays for visitor-facing announcements when AIML ≥ 1.7.0 with public descriptor factory (1.8.0+) is available; source templates remain the fallback.
+**0.5.0** adds optional Universal Multilingual (AIML) template-body overlays for visitor-facing announcements when AIML ≥ 1.7.0 with public descriptor factory (1.8.0+) is available; source templates remain the fallback.
 
 **0.4.1** corrects announcement editor UX: dynamic requirements are derived from the template (no source radio).
 

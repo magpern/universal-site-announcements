@@ -29,7 +29,7 @@ When AIML is absent/incompatible, USA behaviour is unchanged (source templates o
 | Gate | Evidence |
 |------|----------|
 | AIML M5-A.1 on `main` | merge `980e463b73a59901dd50fc12b198c7f1813b0546` |
-| DEV bind-mount | `/opt/biopentra/dev/ai-multilingual` → WP plugins |
+| DEV bind-mount | `/opt/biopentra/dev/universal-multilingual` → WP plugins |
 | Feature probe | `AIML_VERSION=1.8.0`, `FORMAT_HTML=html`, `from_source` + live descriptor construction OK |
 
 Formal AIML/USA GitHub tags remain required only for production/ZIP deploy.
