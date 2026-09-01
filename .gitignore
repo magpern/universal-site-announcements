@@ -5,3 +5,8 @@
 .vscode/
 *.log
 composer.phar
+
+# Release build output (CI-generated; never commit)
+/dist/
+*.zip
+*.zip.sha256

@@ -1,0 +1,72 @@
+name: Release
+
+# Publishes a GitHub Release when an exact version tag is pushed. The tag is
+# expected to sit on a `main` commit that is already green on CI.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write        # only what softprops/action-gh-release needs
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the exact tagged commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - run: composer install --no-interaction --prefer-dist
+
+      - name: Required quality gates
+        run: |
+          composer phpcs
+          vendor/bin/phpunit -c phpunit.xml.dist --testsuite unit
+
+      - name: Build the release package for the tag version
+        run: bash scripts/build-release-package.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Verify package version matches the Git tag
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          zip="dist/universal-site-announcements-${tag_version}.zip"
+          sum="${zip}.sha256"
+          [ -s "$zip" ] || { echo "::error::missing $zip for tag ${GITHUB_REF_NAME}"; ls -la dist || true; exit 1; }
+          [ -s "$sum" ] || { echo "::error::missing $sum"; exit 1; }
+          ( cd dist && sha256sum -c "$(basename "$sum")" )
+          header="$(sed -nE 's/^[[:space:]]*\*?[[:space:]]*Version:[[:space:]]*([0-9A-Za-z.+-]+).*/\1/p' universal-site-announcements.php | head -n1)"
+          const="$(sed -nE "s/.*USA_VERSION',[[:space:]]*'([^']+)'.*/\1/p" universal-site-announcements.php | head -n1)"
+          stable="$(sed -nE 's/^Stable tag:[[:space:]]*([0-9A-Za-z.+-]+).*/\1/p' readme.txt | head -n1)"
+          for v in "$header" "$const" "$stable"; do
+            [ "$v" = "$tag_version" ] || { echo "::error::version declaration '$v' != tag '$tag_version'"; exit 1; }
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/universal-site-announcements-*.zip
+            dist/universal-site-announcements-*.zip.sha256
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+
+      # TODO(private artifact server): a follow-up may add a step here mirroring
+      # the ZIP + .sha256 to the internal artifact server, using a dedicated
+      # secret (never GITHUB_TOKEN), running only after the Release is created.
+      # Endpoint/protocol/secret are not defined for this repo yet.
