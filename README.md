@@ -91,7 +91,21 @@ Weekly activity requires both a selected local weekday and a local date inside t
 composer install
 composer test:unit   # or: vendor/bin/phpunit -c phpunit.xml.dist
 composer phpcs
+bash scripts/build-release-package.sh   # build the deployable plugin ZIP + checksum
 ```
+
+CI (`.github/workflows/ci.yml`) runs PHPCS, the unit suite (PHP 8.1/8.3/8.4),
+and a non-publishing packaging validation on every push and pull request.
+
+## Releases
+
+Pushing an annotated `vX.Y.Z` tag on `main` runs
+`.github/workflows/release.yml`, which builds
+`universal-site-announcements-<version>.zip` + `.zip.sha256` and publishes them
+as GitHub Release assets. Nothing generated is committed. The canonical version
+source (plugin header + `USA_VERSION` + `readme.txt` `Stable tag`), package
+contents, tag format, and recovery steps are documented in
+[`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## License
 
