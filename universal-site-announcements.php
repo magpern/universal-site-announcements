@@ -3,7 +3,7 @@
  * Plugin Name:       Universal Site Announcements
  * Plugin URI:        https://github.com/magpern/universal-site-announcements
  * Description:       Generic site-wide announcement bar with safe inline links. Integrates with the WooCommerce Store Notice seam when WooCommerce is active.
- * Version:           0.5.1
+ * Version:           0.5.2
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            magpern
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'USA_VERSION', '0.5.1' );
+define( 'USA_VERSION', '0.5.2' );
 define( 'USA_PLUGIN_FILE', __FILE__ );
 define( 'USA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'USA_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
@@ -43,6 +43,19 @@ if ( ! is_readable( $usa_autoload ) ) {
 }
 
 require_once $usa_autoload;
+
+/**
+ * Automatic updates via the private update server. Define PRIVATE_UPDATE_SERVER
+ * (scheme + host, no trailing slash) in wp-config.php to enable; when it is not
+ * defined the plugin does not check for updates.
+ */
+if ( defined( 'PRIVATE_UPDATE_SERVER' ) && PRIVATE_UPDATE_SERVER ) {
+	\YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+		rtrim( (string) PRIVATE_UPDATE_SERVER, '/' ) . '/?action=get_metadata&slug=universal-site-announcements',
+		USA_PLUGIN_FILE,
+		'universal-site-announcements'
+	);
+}
 
 register_activation_hook(
 	__FILE__,

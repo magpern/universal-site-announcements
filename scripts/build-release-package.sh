@@ -25,7 +25,7 @@ VERSION_CONST="USA_VERSION"
 INCLUDE=("$MAIN_FILE" src assets readme.txt composer.json README.md)
 HAS_README_TXT="1"        # validate readme.txt Stable tag + changelog
 HAS_CHANGELOG_MD="0"    # validate CHANGELOG.md "## [<version>]" section
-REQUIRE_VENDOR_FILE=""  # path under vendor/ that must exist post-install
+REQUIRE_VENDOR_FILE="yahnis-elsts/plugin-update-checker/plugin-update-checker.php"
 # ==========================================================================
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
