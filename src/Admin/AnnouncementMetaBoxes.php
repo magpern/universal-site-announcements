@@ -109,7 +109,7 @@ final class AnnouncementMetaBoxes {
 	/**
 	 * Snapshot prior body before WP persists the new post_content.
 	 *
-	 * @param int                $post_id Post ID.
+	 * @param int                 $post_id Post ID.
 	 * @param array<string,mixed> $data    Incoming post data.
 	 */
 	public function capture_previous_content( int $post_id, array $data ): void {

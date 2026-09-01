@@ -51,7 +51,7 @@ final class AimlIntegration implements PluginIntegrationInterface, DeclaresChrom
 	 * @param AimlCompatibility $compatibility Compatibility probe.
 	 */
 	public function __construct( PluginIdentity $identity, AimlCompatibility $compatibility ) {
-		$this->identity       = $identity;
+		$this->identity      = $identity;
 		$this->compatibility = $compatibility;
 	}
 
@@ -99,6 +99,7 @@ final class AimlIntegration implements PluginIntegrationInterface, DeclaresChrom
 	/**
 	 * {@inheritdoc}
 	 *
+	 * @param WP_Post $post Post to extract translation units from.
 	 * @return list<TranslationUnitDescriptor>
 	 */
 	public function extract_for_post( WP_Post $post ): array {
@@ -143,6 +144,8 @@ final class AimlIntegration implements PluginIntegrationInterface, DeclaresChrom
 	 * Chrome uses Extension resolver — not host-bound output hooks.
 	 *
 	 * {@inheritdoc}
+	 *
+	 * @param callable $resolve Translation resolver (unused for chrome-owned surfaces).
 	 */
 	public function register_output_hooks( callable $resolve ): void {
 		unset( $resolve );
