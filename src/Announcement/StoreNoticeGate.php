@@ -62,25 +62,15 @@ final class StoreNoticeGate {
 			array(
 				'post_type'      => PostType::POST_TYPE,
 				'post_status'    => 'publish',
-				'posts_per_page' => 1,
+				'posts_per_page' => -1,
 				'fields'         => 'ids',
+				'meta_key'       => '_usa_enabled',
+				'meta_value'     => array( '1', 'yes', true ),
+				'meta_compare'   => 'IN',
 			)
 		);
 
-		if ( empty( $posts ) ) {
-			return false;
-		}
-
-		foreach ( $posts as $post_id ) {
-			$enabled = get_post_meta( $post_id, '_usa_enabled', true );
-			if ( '1' !== (string) $enabled && 'yes' !== (string) $enabled && true !== $enabled ) {
-				continue;
-			}
-
-			return true;
-		}
-
-		return false;
+		return ! empty( $posts );
 	}
 
 	/**
