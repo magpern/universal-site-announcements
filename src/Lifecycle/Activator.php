@@ -48,6 +48,7 @@ final class Activator {
 		);
 
 		if ( null === $content ) {
+			StoreNoticeGate::ensure_gate_enabled_if_needed();
 			return;
 		}
 
