@@ -166,6 +166,99 @@
 		});
 		syncDisplayPanels();
 
+		// M6.1: fixed-row colour fields. Each checkbox enables/disables its
+		// paired native colour input; a disabled input is never submitted,
+		// so unchecked = "inherit host styling" with no hidden-field shadowing.
+		function relativeLuminance(hex) {
+			var m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex || '');
+			if (!m) {
+				return null;
+			}
+			var h = m[1];
+			if (h.length === 3) {
+				h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+			}
+			function linearize(c) {
+				return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+			}
+			var r = linearize(parseInt(h.substr(0, 2), 16) / 255);
+			var g = linearize(parseInt(h.substr(2, 2), 16) / 255);
+			var b = linearize(parseInt(h.substr(4, 2), 16) / 255);
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		}
+
+		function contrastRatio(hexA, hexB) {
+			var lA = relativeLuminance(hexA);
+			var lB = relativeLuminance(hexB);
+			if (lA === null || lB === null) {
+				return null;
+			}
+			var lighter = Math.max(lA, lB);
+			var darker = Math.min(lA, lB);
+			return (lighter + 0.05) / (darker + 0.05);
+		}
+
+		function fieldState(name) {
+			var toggle = document.querySelector('[data-usa-color-toggle="' + name + '"]');
+			var input = document.getElementById(name);
+			if (!toggle || !input || !toggle.checked) {
+				return null;
+			}
+			return input.value;
+		}
+
+		function refreshContrastWarning() {
+			var warning = document.getElementById('usa-contrast-warning');
+			if (!warning) {
+				return;
+			}
+			var bg = fieldState('usa_fixed_bg');
+			var fg = fieldState('usa_fixed_fg');
+			var link = fieldState('usa_fixed_link');
+
+			var messages = [];
+			if (bg && fg) {
+				var textRatio = contrastRatio(bg, fg);
+				if (textRatio !== null && textRatio < 4.5) {
+					messages.push('text ' + textRatio.toFixed(1) + ':1');
+				}
+			}
+			if (bg && link) {
+				var linkRatio = contrastRatio(bg, link);
+				if (linkRatio !== null && linkRatio < 4.5) {
+					messages.push('links ' + linkRatio.toFixed(1) + ':1');
+				}
+			}
+
+			// A ratio is only meaningful when both colours in a pair are
+			// explicitly configured — when background is left to inherit
+			// from the host theme, the actual rendered contrast is unknown
+			// at edit time, so no ratio is claimed.
+			if (messages.length) {
+				warning.textContent =
+					'Low contrast — text may be hard to read (' + messages.join(', ') + ', recommend ≥ 4.5:1).';
+				warning.hidden = false;
+			} else if (bg && (fg || link)) {
+				warning.hidden = true;
+			} else {
+				warning.hidden = true;
+			}
+		}
+
+		document.querySelectorAll('.usa-color-toggle').forEach(function (toggle) {
+			var name = toggle.getAttribute('data-usa-color-toggle');
+			var input = document.getElementById(name);
+			if (!input) {
+				return;
+			}
+			toggle.addEventListener('change', function () {
+				input.disabled = !toggle.checked;
+				refreshContrastWarning();
+			});
+			input.addEventListener('input', refreshContrastWarning);
+		});
+		refreshContrastWarning();
+
 		document.querySelectorAll('.usa-insert-token').forEach(function (btn) {
 			btn.addEventListener('click', function () {
 				insertAtCursor(btn.getAttribute('data-token') || '');

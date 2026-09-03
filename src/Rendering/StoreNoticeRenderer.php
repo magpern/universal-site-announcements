@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace USA\Rendering;
 
 use USA\Announcement\DisplayMode;
+use USA\Announcement\FixedRowStyle;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\Selector;
 use USA\Admin\DiagnosticsNotice;
@@ -172,8 +173,16 @@ final class StoreNoticeRenderer {
 			return null;
 		}
 
+		// Style meta is resolved from validated post meta, never from the
+		// sanitized body above — it never re-enters sanitize_output()/wp_kses
+		// and is fully independent of the AIML/token pipeline (M6.1).
+		$style      = FixedRowStyle::resolve( (int) $row['id'] );
+		$style_attr = FixedRowStyle::has_any( $style )
+			? ' style="' . esc_attr( FixedRowStyle::to_css_vars( $style ) ) . '"'
+			: '';
+
 		return '<span class="' . esc_attr( 'usa-announcement-fixed usa-announcement-fixed--' . $placement ) . '"'
-			. ' data-usa-fixed="' . esc_attr( $placement ) . '">' . $safe . '</span>';
+			. ' data-usa-fixed="' . esc_attr( $placement ) . '"' . $style_attr . '>' . $safe . '</span>';
 	}
 
 	/**

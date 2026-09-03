@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.6.1
+Stable tag: 0.6.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,12 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.6.2 =
+* Optional per-fixed-row colour styling (M6.1): background, text, link, and border/separator colour for fixed-slot announcements only, via CSS custom properties on the row's own wrapper.
+* Strict hex-only validation (WordPress sanitize_hex_color()); absent or invalid values inherit the existing Store Notice styling exactly as before.
+* Rotating announcements, the WooCommerce host notice, AI Multilingual translation, and token/sanitization behaviour are unchanged; no migration and no schema change.
+* Advisory (non-blocking) low-contrast warning in the editor when both colours of a pair are explicitly configured.
 
 = 0.6.1 =
 * Automatic WooCommerce Store Notice gate activation: ensures the gate is enabled when USA is activated or an announcement is saved, so announcements render even if the WooCommerce option was disabled.

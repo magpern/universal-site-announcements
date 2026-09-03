@@ -2,9 +2,12 @@
  * Universal Site Announcements — multi-message rotation shell and fixed rows.
  *
  * Shell must not restyle the host store-notice bar; pause control overlays
- * without compressing bar width. Fixed rows (M6) own block layout and a
- * currentColor separator only — colour, background and typography stay with
- * the host theme.
+ * without compressing bar width. Fixed rows (M6) own block layout; M6.1 adds
+ * optional per-row colour via CSS custom properties set inline on each fixed
+ * row's own wrapper span (see FixedRowStyle/StoreNoticeRenderer). Rotating
+ * rows and the host notice never receive these properties. Falling back to
+ * transparent/inherit/currentColor when a property is unset reproduces the
+ * pre-M6.1 host-theme-only appearance exactly.
  */
 
 .usa-announcement-shell {
@@ -84,6 +87,25 @@
 	padding-top: 0.4em;
 	margin-top: 0.4em;
 	border-top: 1px solid currentColor;
+}
+
+/* M6.1: optional per-fixed-row colour via CSS custom properties set inline
+ * on the wrapper span. Absent properties fall back to the M6 appearance. */
+.usa-announcement-fixed {
+	background: var(--usa-fixed-bg, transparent);
+	color: var(--usa-fixed-fg, inherit);
+}
+
+.usa-announcement-fixed a {
+	color: var(--usa-fixed-link, inherit);
+}
+
+.usa-announcement-fixed--above {
+	border-bottom-color: var(--usa-fixed-border, currentColor);
+}
+
+.usa-announcement-fixed--below {
+	border-top-color: var(--usa-fixed-border, currentColor);
 }
 
 @media (prefers-reduced-motion: reduce) {
