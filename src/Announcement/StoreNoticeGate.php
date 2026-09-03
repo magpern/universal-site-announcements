@@ -58,6 +58,7 @@ final class StoreNoticeGate {
 	 * @return bool True if at least one enabled and published announcement exists.
 	 */
 	public static function has_eligible_announcements(): bool {
+		// phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 		$posts = get_posts(
 			array(
 				'post_type'      => PostType::POST_TYPE,
@@ -69,6 +70,7 @@ final class StoreNoticeGate {
 				'meta_compare'   => 'IN',
 			)
 		);
+		// phpcs:enable WordPress.DB.SlowDBQuery
 
 		return ! empty( $posts );
 	}
