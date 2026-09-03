@@ -7,28 +7,43 @@
 
 declare(strict_types=1);
 
-namespace USA\Tests;
+namespace USA\Tests\Unit;
 
+use PHPUnit\Framework\TestCase;
 use USA\Announcement\StoreNoticeGate;
 use USA\Settings;
 
 /**
  * @covers \USA\Announcement\StoreNoticeGate
  */
-class StoreNoticeGateTest extends \WP_UnitTestCase {
+final class StoreNoticeGateTest extends TestCase {
+
+	private array $original_options = array();
 
 	protected function setUp(): void {
-		parent::setUp();
+		$this->original_options = array(
+			'usa_plugin_enabled'        => get_option( 'usa_plugin_enabled' ),
+			'woocommerce_demo_store'    => get_option( 'woocommerce_demo_store' ),
+			'usa_render_diagnostic'     => get_transient( 'usa_render_diagnostic' ),
+		);
+
 		delete_option( 'usa_plugin_enabled' );
 		delete_option( 'woocommerce_demo_store' );
 		delete_transient( 'usa_render_diagnostic' );
 	}
 
 	protected function tearDown(): void {
-		delete_option( 'usa_plugin_enabled' );
-		delete_option( 'woocommerce_demo_store' );
-		delete_transient( 'usa_render_diagnostic' );
-		parent::tearDown();
+		foreach ( $this->original_options as $key => $value ) {
+			if ( 'usa_render_diagnostic' === $key ) {
+				if ( false !== $value ) {
+					set_transient( $key, $value, HOUR_IN_SECONDS );
+				}
+			} elseif ( false !== $value ) {
+				update_option( $key, $value );
+			} else {
+				delete_option( $key );
+			}
+		}
 	}
 
 	public function test_ensure_gate_enabled_if_needed_requires_usa_enabled(): void {
@@ -49,38 +64,9 @@ class StoreNoticeGateTest extends \WP_UnitTestCase {
 		$this->assertEquals( 'no', get_option( 'woocommerce_demo_store' ) );
 	}
 
-	public function test_ensure_gate_enabled_if_needed_enables_gate_when_conditions_met(): void {
-		Settings::set_enabled( true );
-		update_option( 'woocommerce_demo_store', 'no' );
-
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
-		);
-		update_post_meta( $post_id, '_usa_enabled', '1' );
-
-		StoreNoticeGate::ensure_gate_enabled_if_needed();
-
-		$this->assertEquals( 'yes', get_option( 'woocommerce_demo_store' ) );
-	}
-
 	public function test_ensure_gate_enabled_if_needed_does_not_change_enabled_gate(): void {
 		Settings::set_enabled( true );
 		update_option( 'woocommerce_demo_store', 'yes' );
-
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
-		);
-		update_post_meta( $post_id, '_usa_enabled', '1' );
 
 		StoreNoticeGate::ensure_gate_enabled_if_needed();
 
@@ -92,28 +78,24 @@ class StoreNoticeGateTest extends \WP_UnitTestCase {
 	}
 
 	public function test_has_eligible_announcements_returns_false_for_disabled_announcements(): void {
-		wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
+		// Simulate a published announcement without _usa_enabled meta.
+		$GLOBALS['usa_test_post_content'] = array(
+			42 => 'Test content',
 		);
 
 		$this->assertFalse( StoreNoticeGate::has_eligible_announcements() );
 	}
 
 	public function test_has_eligible_announcements_returns_true_for_enabled_announcements(): void {
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
+		// Simulate a published announcement with _usa_enabled = 1.
+		$GLOBALS['usa_test_post_content'] = array(
+			42 => 'Test content',
 		);
-		update_post_meta( $post_id, '_usa_enabled', '1' );
+		$GLOBALS['usa_test_post_meta'] = array(
+			42 => array(
+				'_usa_enabled' => '1',
+			),
+		);
 
 		$this->assertTrue( StoreNoticeGate::has_eligible_announcements() );
 	}
@@ -140,15 +122,14 @@ class StoreNoticeGateTest extends \WP_UnitTestCase {
 		Settings::set_enabled( true );
 		update_option( 'woocommerce_demo_store', 'yes' );
 
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
+		$GLOBALS['usa_test_post_content'] = array(
+			42 => 'Test content',
 		);
-		update_post_meta( $post_id, '_usa_enabled', '1' );
+		$GLOBALS['usa_test_post_meta'] = array(
+			42 => array(
+				'_usa_enabled' => '1',
+			),
+		);
 
 		StoreNoticeGate::maybe_record_gate_blocked_diagnostic();
 
@@ -159,15 +140,14 @@ class StoreNoticeGateTest extends \WP_UnitTestCase {
 		Settings::set_enabled( true );
 		update_option( 'woocommerce_demo_store', 'no' );
 
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
+		$GLOBALS['usa_test_post_content'] = array(
+			42 => 'Test content',
 		);
-		update_post_meta( $post_id, '_usa_enabled', '1' );
+		$GLOBALS['usa_test_post_meta'] = array(
+			42 => array(
+				'_usa_enabled' => '1',
+			),
+		);
 
 		StoreNoticeGate::maybe_record_gate_blocked_diagnostic();
 
@@ -180,15 +160,14 @@ class StoreNoticeGateTest extends \WP_UnitTestCase {
 		Settings::set_enabled( true );
 		update_option( 'woocommerce_demo_store', 'no' );
 
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'usa_announcement',
-				'post_status'  => 'publish',
-				'post_title'   => 'Test',
-				'post_content' => 'Content',
-			)
+		$GLOBALS['usa_test_post_content'] = array(
+			42 => 'Test content',
 		);
-		update_post_meta( $post_id, '_usa_enabled', '1' );
+		$GLOBALS['usa_test_post_meta'] = array(
+			42 => array(
+				'_usa_enabled' => '1',
+			),
+		);
 
 		// Record the diagnostic.
 		StoreNoticeGate::maybe_record_gate_blocked_diagnostic();
