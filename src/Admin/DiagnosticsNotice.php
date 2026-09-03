@@ -20,6 +20,8 @@ final class DiagnosticsNotice {
 
 	public const CODE_OVERLAY_TOKEN_SIGNATURE_MISMATCH = 'overlay_token_signature_mismatch';
 
+	public const CODE_STORE_NOTICE_GATE_DISABLED = 'store_notice_gate_disabled';
+
 	/**
 	 * Prefix for fixed-slot collision codes.
 	 *
@@ -217,6 +219,8 @@ final class DiagnosticsNotice {
 			return;
 		}
 
+		\USA\Announcement\StoreNoticeGate::maybe_record_gate_blocked_diagnostic();
+
 		$data = get_transient( self::TRANSIENT_KEY );
 		if ( ! is_array( $data ) || empty( $data['code'] ) ) {
 			return;
@@ -239,6 +243,13 @@ final class DiagnosticsNotice {
 	public function message_for_code( string $code ): string {
 		if ( 0 === strpos( $code, self::CODE_FIXED_SLOT_COLLISION_PREFIX ) ) {
 			return $this->fixed_slot_collision_message( $code );
+		}
+
+		if ( self::CODE_STORE_NOTICE_GATE_DISABLED === $code ) {
+			return __(
+				'WooCommerce Store Notice is disabled. Universal Site Announcements requires this setting to be enabled to display announcements on the storefront. Enable "Display store notice" in WooCommerce settings.',
+				'universal-site-announcements'
+			);
 		}
 
 		if ( self::CODE_OVERLAY_TOKEN_SIGNATURE_MISMATCH === $code ) {

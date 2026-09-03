@@ -13,6 +13,7 @@ use USA\Announcement\DisplayMode;
 use USA\Announcement\PostType;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
+use USA\Announcement\StoreNoticeGate;
 use USA\Integration\AimlCompatibility;
 use USA\Lifecycle\Schema;
 use USA\Provider\WooCommerceFreeShippingProvider;
@@ -672,10 +673,12 @@ final class AnnouncementMetaBoxes {
 			$ends_utc   = '' !== $ends_raw ? $this->schedule->site_local_to_utc( $ends_raw, $tz ) : null;
 			if ( '' !== $starts_raw && null === $starts_utc ) {
 				$this->queue_error( __( 'Invalid Starts at value. Previous schedule was kept.', 'universal-site-announcements' ) );
+				StoreNoticeGate::ensure_gate_enabled_if_needed();
 				return;
 			}
 			if ( '' !== $ends_raw && null === $ends_utc ) {
 				$this->queue_error( __( 'Invalid Ends at value. Previous schedule was kept.', 'universal-site-announcements' ) );
+				StoreNoticeGate::ensure_gate_enabled_if_needed();
 				return;
 			}
 			update_post_meta( $post_id, ScheduleEvaluator::META_MODE, ScheduleEvaluator::MODE_INTERVAL );
@@ -689,6 +692,7 @@ final class AnnouncementMetaBoxes {
 			} else {
 				update_post_meta( $post_id, ScheduleEvaluator::META_ENDS_AT, $ends_utc );
 			}
+			StoreNoticeGate::ensure_gate_enabled_if_needed();
 			return;
 		}
 
@@ -696,10 +700,12 @@ final class AnnouncementMetaBoxes {
 			$weekdays = $this->schedule->normalize_weekdays_input( $week_raw );
 			if ( null === $weekdays ) {
 				$this->queue_error( __( 'Invalid weekday selection. Previous schedule was kept.', 'universal-site-announcements' ) );
+				StoreNoticeGate::ensure_gate_enabled_if_needed();
 				return;
 			}
 			if ( array() === $weekdays ) {
 				$this->queue_error( __( 'Select at least one weekday for weekly recurrence. Previous schedule was kept.', 'universal-site-announcements' ) );
+				StoreNoticeGate::ensure_gate_enabled_if_needed();
 				return;
 			}
 
@@ -710,6 +716,7 @@ final class AnnouncementMetaBoxes {
 				} else {
 					$this->queue_error( __( 'Invalid weekly date window. Previous schedule was kept.', 'universal-site-announcements' ) );
 				}
+				StoreNoticeGate::ensure_gate_enabled_if_needed();
 				return;
 			}
 
@@ -725,11 +732,13 @@ final class AnnouncementMetaBoxes {
 			} else {
 				update_post_meta( $post_id, ScheduleEvaluator::META_WEEKLY_ENDS_ON, $window['ends_on'] );
 			}
+			StoreNoticeGate::ensure_gate_enabled_if_needed();
 			return;
 		}
 
 		// Always: persist mode only; retain interval / weekday / window meta.
 		update_post_meta( $post_id, ScheduleEvaluator::META_MODE, ScheduleEvaluator::MODE_ALWAYS );
+		StoreNoticeGate::ensure_gate_enabled_if_needed();
 	}
 
 	/**

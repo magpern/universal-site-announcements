@@ -11,6 +11,7 @@ namespace USA\Lifecycle;
 
 use USA\Announcement\PostType;
 use USA\Announcement\Sanitizer;
+use USA\Announcement\StoreNoticeGate;
 use USA\Settings;
 
 /**
@@ -61,11 +62,14 @@ final class Activator {
 		);
 
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
+			StoreNoticeGate::ensure_gate_enabled_if_needed();
 			return;
 		}
 
 		update_post_meta( (int) $post_id, '_usa_enabled', '1' );
 		update_post_meta( (int) $post_id, '_usa_priority', '10' );
 		update_post_meta( (int) $post_id, '_usa_source', 'manual' );
+
+		StoreNoticeGate::ensure_gate_enabled_if_needed();
 	}
 }
