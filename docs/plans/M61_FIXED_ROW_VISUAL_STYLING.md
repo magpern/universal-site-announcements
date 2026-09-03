@@ -1,6 +1,6 @@
 # M6.1 — Fixed-Row Visual Styling
 
-**Status:** DRAFT — pending PO approval
+**Status:** FROZEN — PO APPROVED
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)
 **Plugin:** Universal Site Announcements (`universal-site-announcements`)
 **Namespace:** `USA\`
@@ -9,7 +9,8 @@
 **Planning baseline `main` SHA:** `48694022f26c98d6c62d2b9c845c17c9927960a3`
 **Baseline version:** 0.6.1 (`universal-site-announcements.php:23`, `USA_VERSION`); `Schema::VERSION = 4` unchanged since M6
 **Target version:** **0.6.2**
-**Implementation branch (future task):** `feature/m61-fixed-row-visual-styling` (from the post-freeze `main`)
+**Implementation branch:** `feature/m61-fixed-row-visual-styling` (from the post-freeze `main`)
+**Frozen:** 2026-09-03
 
 ---
 
@@ -338,10 +339,13 @@ later, independently authorized step.
 
 ---
 
-## 14. Commit and PR (this planning task only)
+## 14. Commit and PR history
 
-- Branch: `plan/m61-fixed-row-visual-styling`
-- Commit (docs only): `docs: add M6.1 fixed-row visual styling plan`
-- Pushed, opened as an **unmerged** PR to `main`.
-- Not frozen, not merged, no tag/release/ZIP, no DEV change, as part of this
-  planning task.
+- Planning PR [#20](https://github.com/magpern/universal-site-announcements/pull/20)
+  (branch `plan/m61-fixed-row-visual-styling`): documentation-only, added
+  this plan as `DRAFT — pending PO approval`.
+- Freeze commit (this section's edit) marks the plan `FROZEN — PO APPROVED`
+  and merges PR #20 to `main`. No code, tag, release, ZIP, or DEV change is
+  authorized by the freeze itself — only the separate implementation task
+  described in §10-§13 above, executed on `feature/m61-fixed-row-visual-styling`
+  from the post-freeze `main`.
