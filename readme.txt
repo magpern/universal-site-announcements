@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.6.0
+Stable tag: 0.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,11 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.6.1 =
+* Automatic WooCommerce Store Notice gate activation: ensures the gate is enabled when USA is activated or an announcement is saved, so announcements render even if the WooCommerce option was disabled.
+* Diagnostic warning when gate blocks rendering: explains the WooCommerce dependency and offers remediation.
+* Enhanced test infrastructure: delete_option() stub, post type filtering in get_posts() mock.
 
 = 0.6.0 =
 * Fixed-slot announcement rows (M6): any announcement can be set to Fixed slot and shown above or below the rotating bar, outside the rotation.
