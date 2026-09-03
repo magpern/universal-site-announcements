@@ -16,6 +16,33 @@ namespace USA\Rendering;
 final class ContentReplacer {
 
 	/**
+	 * Compose fixed-above, rotating, and fixed-below fragments into one inner HTML string.
+	 *
+	 * The result is passed to replace(), so the single-host-element contract is
+	 * unchanged: one store-notice paragraph in, one out. Fragments that are null
+	 * or empty contribute nothing — no empty wrapper is ever emitted.
+	 *
+	 * @param string|null $above_html          Already-sanitised fixed-above fragment, or null.
+	 * @param string      $rotating_inner_html Already-sanitised rotating inner HTML ('' when none).
+	 * @param string|null $below_html          Already-sanitised fixed-below fragment, or null.
+	 */
+	public function compose( ?string $above_html, string $rotating_inner_html, ?string $below_html ): string {
+		$parts = array();
+
+		if ( null !== $above_html && '' !== $above_html ) {
+			$parts[] = $above_html;
+		}
+		if ( '' !== $rotating_inner_html ) {
+			$parts[] = $rotating_inner_html;
+		}
+		if ( null !== $below_html && '' !== $below_html ) {
+			$parts[] = $below_html;
+		}
+
+		return implode( '', $parts );
+	}
+
+	/**
 	 * Replace inner content of the recognised store-notice paragraph.
 	 *
 	 * @param string $upstream_html Filtered markup from WooCommerce/host/theme.

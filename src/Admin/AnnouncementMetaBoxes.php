@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace USA\Admin;
 
+use USA\Announcement\DisplayMode;
 use USA\Announcement\PostType;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
@@ -102,6 +103,7 @@ final class AnnouncementMetaBoxes {
 		add_filter( 'content_save_pre', array( $this, 'sanitize_content_on_save' ), 10, 1 );
 		add_action( 'admin_notices', array( $this, 'render_admin_errors' ) );
 		add_action( 'admin_notices', array( $this, 'render_invalid_template_notice' ) );
+		add_action( 'admin_notices', array( $this, 'render_fixed_collision_notice' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_editor_assets' ) );
 		add_action( 'wp_ajax_usa_search_products', array( $this, 'ajax_search_products' ) );
 	}
@@ -268,6 +270,10 @@ final class AnnouncementMetaBoxes {
 		if ( null === $weekdays ) {
 			$weekdays = array();
 		}
+		$display      = DisplayMode::resolve( (int) $post->ID );
+		$display_mode = $display['mode'];
+		$placement    = $display['placement'] ?? DisplayMode::PLACEMENT_ABOVE;
+
 		$weekly_starts = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKLY_STARTS_ON, true );
 		$weekly_ends   = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKLY_ENDS_ON, true );
 		$day_labels    = $this->schedule->weekday_full_labels();
@@ -279,9 +285,44 @@ final class AnnouncementMetaBoxes {
 			</label>
 		</p>
 		<p>
-			<label for="usa_priority"><?php echo esc_html__( 'Priority (lower first)', 'universal-site-announcements' ); ?></label><br />
+			<label for="usa_priority"><?php echo esc_html__( 'Priority (lower first; for fixed slots decides which one is shown)', 'universal-site-announcements' ); ?></label><br />
 			<input type="number" id="usa_priority" name="usa_priority" value="<?php echo esc_attr( (string) $priority ); ?>" class="small-text" required />
 		</p>
+
+		<fieldset class="usa-display-mode" style="margin:12px 0;padding:8px 0;border-top:1px solid #dcdcde;">
+			<legend style="font-weight:600;padding:0;">
+				<?php echo esc_html__( 'Display mode', 'universal-site-announcements' ); ?>
+			</legend>
+			<p style="margin:8px 0;">
+				<label style="display:block;margin-bottom:4px;">
+					<input type="radio" name="usa_display_mode" value="<?php echo esc_attr( DisplayMode::MODE_ROTATING ); ?>" <?php checked( $display_mode, DisplayMode::MODE_ROTATING ); ?> />
+					<?php echo esc_html__( 'Rotating', 'universal-site-announcements' ); ?>
+					<span class="description"><?php echo esc_html__( '— takes part in the rotating announcement bar (default).', 'universal-site-announcements' ); ?></span>
+				</label>
+				<label style="display:block;">
+					<input type="radio" name="usa_display_mode" value="<?php echo esc_attr( DisplayMode::MODE_FIXED ); ?>" <?php checked( $display_mode, DisplayMode::MODE_FIXED ); ?> />
+					<?php echo esc_html__( 'Fixed slot', 'universal-site-announcements' ); ?>
+					<span class="description"><?php echo esc_html__( '— always shown in its own row, outside the rotation.', 'universal-site-announcements' ); ?></span>
+				</label>
+			</p>
+		</fieldset>
+
+		<div class="usa-display-panel" data-usa-display="<?php echo esc_attr( DisplayMode::MODE_FIXED ); ?>" <?php echo DisplayMode::MODE_FIXED === $display_mode ? '' : 'hidden'; ?>>
+			<fieldset>
+				<legend><?php echo esc_html__( 'Fixed row position', 'universal-site-announcements' ); ?></legend>
+				<label style="display:block;margin:2px 0;">
+					<input type="radio" name="usa_fixed_placement" value="<?php echo esc_attr( DisplayMode::PLACEMENT_ABOVE ); ?>" <?php checked( $placement, DisplayMode::PLACEMENT_ABOVE ); ?> />
+					<?php echo esc_html__( 'Above rotating announcements', 'universal-site-announcements' ); ?>
+				</label>
+				<label style="display:block;margin:2px 0;">
+					<input type="radio" name="usa_fixed_placement" value="<?php echo esc_attr( DisplayMode::PLACEMENT_BELOW ); ?>" <?php checked( $placement, DisplayMode::PLACEMENT_BELOW ); ?> />
+					<?php echo esc_html__( 'Below rotating announcements', 'universal-site-announcements' ); ?>
+				</label>
+			</fieldset>
+			<p class="description">
+				<?php echo esc_html__( 'Only one fixed announcement is shown per position. If several are active at the same time, the lowest priority (then the lowest ID) wins. Enabled, schedule and template rules still apply.', 'universal-site-announcements' ); ?>
+			</p>
+		</div>
 
 		<fieldset class="usa-schedule-mode" style="margin:12px 0;padding:8px 0;border-top:1px solid #dcdcde;">
 			<legend style="font-weight:600;padding:0;">
@@ -599,6 +640,15 @@ final class AnnouncementMetaBoxes {
 			update_post_meta( $post_id, '_usa_priority', '10' );
 		}
 
+		$display = DisplayMode::normalize(
+			isset( $_POST['usa_display_mode'] ) ? sanitize_key( wp_unslash( $_POST['usa_display_mode'] ) ) : '',
+			isset( $_POST['usa_fixed_placement'] ) ? sanitize_key( wp_unslash( $_POST['usa_fixed_placement'] ) ) : ''
+		);
+		update_post_meta( $post_id, DisplayMode::META_MODE, $display['mode'] );
+		if ( null !== $display['placement'] ) {
+			update_post_meta( $post_id, DisplayMode::META_PLACEMENT, $display['placement'] );
+		}
+
 		$tz = $this->schedule->site_timezone_string();
 
 		$mode = isset( $_POST['usa_schedule_mode'] ) ? sanitize_key( wp_unslash( $_POST['usa_schedule_mode'] ) ) : ScheduleEvaluator::MODE_ALWAYS;
@@ -771,6 +821,61 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
+	 * Non-blocking warning when other enabled fixed announcements share this position.
+	 */
+	public function render_fixed_collision_notice(): void {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || PostType::POST_TYPE !== $screen->post_type || 'post' !== $screen->base ) {
+			return;
+		}
+		if ( ! current_user_can( Settings::manage_cap() ) ) {
+			return;
+		}
+
+		$post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( $post_id < 1 ) {
+			return;
+		}
+
+		$enabled = get_post_meta( $post_id, '_usa_enabled', true );
+		if ( '1' !== (string) $enabled && 'yes' !== (string) $enabled ) {
+			return;
+		}
+
+		$display = DisplayMode::resolve( $post_id );
+		if ( DisplayMode::MODE_FIXED !== $display['mode'] ) {
+			return;
+		}
+
+		$others = $this->other_enabled_fixed_announcements( $post_id, (string) $display['placement'] );
+		if ( array() === $others ) {
+			return;
+		}
+
+		$links = array();
+		foreach ( $others as $other_id ) {
+			$title   = get_the_title( $other_id );
+			$links[] = sprintf(
+				'%1$s (#%2$d)',
+				'' !== (string) $title ? (string) $title : __( '(no title)', 'universal-site-announcements' ),
+				$other_id
+			);
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p>%s</p></div>',
+			esc_html(
+				sprintf(
+					/* translators: 1: placement (above/below), 2: comma-separated announcement titles and IDs */
+					__( 'Other enabled fixed announcements use the "%1$s" position: %2$s. Only one is shown at a time (lowest priority, then lowest ID, wins) unless their schedules do not overlap.', 'universal-site-announcements' ),
+					(string) $display['placement'],
+					implode( ', ', $links )
+				)
+			)
+		);
+	}
+
+	/**
 	 * Enqueue editor script + styles.
 	 *
 	 * @param string $hook Admin page hook.
@@ -878,6 +983,39 @@ final class AnnouncementMetaBoxes {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Other enabled fixed announcements sharing a placement.
+	 *
+	 * @param int    $post_id   Current post ID.
+	 * @param string $placement Placement (above|below).
+	 * @return list<int>
+	 */
+	private function other_enabled_fixed_announcements( int $post_id, string $placement ): array {
+		$posts = get_posts(
+			array(
+				'post_type'      => PostType::POST_TYPE,
+				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+				'posts_per_page' => -1,
+				'post__not_in'   => array( $post_id ),
+			)
+		);
+
+		$out = array();
+		foreach ( $posts as $post ) {
+			$enabled = get_post_meta( $post->ID, '_usa_enabled', true );
+			if ( '1' !== (string) $enabled && 'yes' !== (string) $enabled ) {
+				continue;
+			}
+			$display = DisplayMode::resolve( (int) $post->ID );
+			if ( DisplayMode::MODE_FIXED !== $display['mode'] || $placement !== (string) $display['placement'] ) {
+				continue;
+			}
+			$out[] = (int) $post->ID;
+		}
+
+		return $out;
 	}
 
 	/**

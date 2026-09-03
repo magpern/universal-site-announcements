@@ -82,7 +82,7 @@ final class Repository {
 	 *
 	 * Considers publish + enabled + schedule + derived template requirements.
 	 *
-	 * @return list<array{id:int,priority:int,content:string,source:string}>
+	 * @return list<array{id:int,priority:int,content:string,source:string,mode:string,placement:?string}>
 	 */
 	public function get_active(): array {
 		$posts = get_posts(
@@ -148,11 +148,15 @@ final class Repository {
 				continue;
 			}
 
+			$display = DisplayMode::resolve( (int) $post->ID );
+
 			$rows[] = array(
-				'id'       => (int) $post->ID,
-				'priority' => $priority,
-				'content'  => $content,
-				'source'   => $source,
+				'id'        => (int) $post->ID,
+				'priority'  => $priority,
+				'content'   => $content,
+				'source'    => $source,
+				'mode'      => $display['mode'],
+				'placement' => $display['placement'],
 			);
 		}
 

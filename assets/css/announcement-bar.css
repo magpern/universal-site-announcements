@@ -1,8 +1,10 @@
 /**
- * Universal Site Announcements — multi-message rotation shell.
+ * Universal Site Announcements — multi-message rotation shell and fixed rows.
  *
  * Shell must not restyle the host store-notice bar; pause control overlays
- * without compressing bar width.
+ * without compressing bar width. Fixed rows (M6) own block layout and a
+ * currentColor separator only — colour, background and typography stay with
+ * the host theme.
  */
 
 .usa-announcement-shell {
@@ -65,8 +67,32 @@
 	display: inline-block;
 }
 
+/* M6 fixed-slot rows: static, never animated, rendered inside the host <p>. */
+.usa-announcement-fixed {
+	display: block;
+	transition: none;
+	animation: none;
+}
+
+.usa-announcement-fixed--above {
+	padding-bottom: 0.4em;
+	margin-bottom: 0.4em;
+	border-bottom: 1px solid currentColor;
+}
+
+.usa-announcement-fixed--below {
+	padding-top: 0.4em;
+	margin-top: 0.4em;
+	border-top: 1px solid currentColor;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.usa-announcement-bar__message {
 		transition: none;
+	}
+
+	.usa-announcement-fixed {
+		transition: none;
+		animation: none;
 	}
 }

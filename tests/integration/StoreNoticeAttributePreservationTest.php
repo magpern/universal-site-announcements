@@ -44,6 +44,56 @@ final class StoreNoticeAttributePreservationTest extends TestCase {
 	}
 
 	/**
+	 * Composed fixed + rotating fragments keep one host paragraph and its attributes.
+	 */
+	public function test_composed_fixed_fragments_keep_single_paragraph_and_attributes(): void {
+		$upstream = '<p role="complementary" aria-label="Store notice" class="woocommerce-store-notice demo_store" data-position="bottom" style="color: red; display: none;">OLD</p>';
+		$replacer = new ContentReplacer();
+
+		$inner = $replacer->compose(
+			'<span class="usa-announcement-fixed usa-announcement-fixed--above" data-usa-fixed="above">KYC</span>',
+			'<span class="usa-announcement-bar__message is-active">One</span><span class="usa-announcement-bar__message">Two</span>',
+			'<span class="usa-announcement-fixed usa-announcement-fixed--below" data-usa-fixed="below">Payments</span>'
+		);
+
+		$result = $replacer->replace( $upstream, $inner );
+		$this->assertTrue( $result['ok'] );
+		$html = $result['html'];
+
+		$this->assertSame( 1, (int) preg_match_all( '/<p\b/i', $html ) );
+		$this->assertStringContainsString( 'data-position="bottom"', $html );
+		$this->assertStringContainsString( 'role="complementary"', $html );
+		$this->assertStringContainsString( 'aria-label="Store notice"', $html );
+		$this->assertStringContainsString( 'color: red', $html );
+		$this->assertStringNotContainsString( 'display: none', $html );
+		$this->assertStringNotContainsString( 'OLD', $html );
+		$this->assertMatchesRegularExpression(
+			'/usa-announcement-fixed--above.*usa-announcement-bar__message is-active.*usa-announcement-fixed--below/s',
+			$html
+		);
+
+		$shell = $replacer->wrap_shell(
+			$html,
+			'<button type="button" class="usa-announcement-bar__toggle" aria-pressed="false">Pause announcements</button>'
+		);
+		$this->assertMatchesRegularExpression( '/<\/p><button /', $shell );
+		$this->assertSame( 1, (int) preg_match_all( '/<p\b/i', $shell ) );
+	}
+
+	/**
+	 * compose() emits no wrapper for absent or empty fragments.
+	 */
+	public function test_compose_omits_absent_fragments(): void {
+		$replacer = new ContentReplacer();
+
+		$this->assertSame( 'ROT', $replacer->compose( null, 'ROT', null ) );
+		$this->assertSame( 'ABOVE', $replacer->compose( 'ABOVE', '', null ) );
+		$this->assertSame( 'BELOW', $replacer->compose( '', '', 'BELOW' ) );
+		$this->assertSame( '', $replacer->compose( null, '', null ) );
+		$this->assertSame( 'ABOVEROTBELOW', $replacer->compose( 'ABOVE', 'ROT', 'BELOW' ) );
+	}
+
+	/**
 	 * Unrecognised markup passes through unchanged.
 	 */
 	public function test_unrecognised_markup_passthrough(): void {

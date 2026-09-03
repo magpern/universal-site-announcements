@@ -20,6 +20,15 @@ final class DiagnosticsNotice {
 
 	public const CODE_OVERLAY_TOKEN_SIGNATURE_MISMATCH = 'overlay_token_signature_mismatch';
 
+	/**
+	 * Prefix for fixed-slot collision codes.
+	 *
+	 * Full identity is `fixed_slot_collision:<placement>:<id1,id2,...>` so the
+	 * stored diagnostic is replaced whenever the competing candidate set or the
+	 * winning announcement changes.
+	 */
+	public const CODE_FIXED_SLOT_COLLISION_PREFIX = 'fixed_slot_collision:';
+
 	public const AJAX_ACTION = 'usa_dismiss_render_diagnostic';
 
 	/**
@@ -110,6 +119,41 @@ final class DiagnosticsNotice {
 	}
 
 	/**
+	 * Replace a stale identity-encoded diagnostic sharing a code prefix.
+	 *
+	 * Clears the stored diagnostic when its code starts with $prefix but its
+	 * identity — the code, or the announcement it points at — differs from what
+	 * currently applies (pass an empty code when the condition no longer applies
+	 * at all). This guarantees a stale notice is replaced when the competing set
+	 * or the winning announcement changes.
+	 *
+	 * @param string $prefix          Code prefix, e.g. fixed_slot_collision:above:.
+	 * @param string $current_code    Code that currently applies, or '' for none.
+	 * @param int    $current_post_id Announcement the current code points at (0 when none).
+	 */
+	public static function clear_if_stale_prefix( string $prefix, string $current_code, int $current_post_id = 0 ): void {
+		if ( '' === $prefix ) {
+			return;
+		}
+
+		$data = get_transient( self::TRANSIENT_KEY );
+		if ( ! is_array( $data ) || empty( $data['code'] ) ) {
+			return;
+		}
+
+		$code = (string) $data['code'];
+		if ( 0 !== strpos( $code, $prefix ) ) {
+			return;
+		}
+
+		if ( $code === $current_code && (int) ( $data['post_id'] ?? 0 ) === $current_post_id ) {
+			return;
+		}
+
+		delete_transient( self::TRANSIENT_KEY );
+	}
+
+	/**
 	 * Dismiss / clear the stored diagnostic unconditionally.
 	 */
 	public static function clear(): void {
@@ -192,7 +236,11 @@ final class DiagnosticsNotice {
 	 *
 	 * @param string $code Failure code.
 	 */
-	private function message_for_code( string $code ): string {
+	public function message_for_code( string $code ): string {
+		if ( 0 === strpos( $code, self::CODE_FIXED_SLOT_COLLISION_PREFIX ) ) {
+			return $this->fixed_slot_collision_message( $code );
+		}
+
 		if ( self::CODE_OVERLAY_TOKEN_SIGNATURE_MISMATCH === $code ) {
 			return __(
 				'Universal Site Announcements fell back to the source announcement template because a translation changed protected merge tags. Edit the translation so tokens match the source exactly.',
@@ -224,6 +272,29 @@ final class DiagnosticsNotice {
 		return __(
 			'Universal Site Announcements could not safely replace the Store Notice markup. Upstream HTML was left unchanged. Check that the host notice still uses a paragraph with classes woocommerce-store-notice and demo_store.',
 			'universal-site-announcements'
+		);
+	}
+
+	/**
+	 * Actionable message for a fixed-slot collision code.
+	 *
+	 * @param string $code Full collision code.
+	 */
+	private function fixed_slot_collision_message( string $code ): string {
+		$rest      = substr( $code, strlen( self::CODE_FIXED_SLOT_COLLISION_PREFIX ) );
+		$parts     = explode( ':', (string) $rest, 2 );
+		$placement = isset( $parts[0] ) ? (string) $parts[0] : '';
+		$ids       = isset( $parts[1] ) ? (string) $parts[1] : '';
+
+		$data      = get_transient( self::TRANSIENT_KEY );
+		$winner_id = is_array( $data ) ? (int) ( $data['post_id'] ?? 0 ) : 0;
+
+		return sprintf(
+			/* translators: 1: placement (above/below), 2: winning announcement ID, 3: comma-separated competing announcement IDs */
+			__( 'Universal Site Announcements is showing only one fixed announcement in the "%1$s" position. Announcement #%2$d wins; the other competing announcements (%3$s) are hidden while their schedules overlap. The lowest priority, then the lowest ID, wins — adjust priority, schedule, or the Mode column to choose a different one.', 'universal-site-announcements' ),
+			$placement,
+			$winner_id,
+			$ids
 		);
 	}
 }

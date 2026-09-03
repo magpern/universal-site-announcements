@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.5.2
+Stable tag: 0.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -11,7 +11,7 @@ Generic site-wide announcement bar with safe inline links for WordPress.
 
 == Description ==
 
-Universal Site Announcements manages site-wide announcement messages and can integrate with the WooCommerce Store Notice rendering seam. Dynamic requirements (including free shipping) are derived from the message template. Milestone 4 adds schedule modes (always, one-time interval, weekly recurring with optional date window). Milestone 5-B optionally localizes announcement template bodies through AI Multilingual when available.
+Universal Site Announcements manages site-wide announcement messages and can integrate with the WooCommerce Store Notice rendering seam. Dynamic requirements (including free shipping) are derived from the message template. Milestone 4 adds schedule modes (always, one-time interval, weekly recurring with optional date window). Milestone 5-B optionally localizes announcement template bodies through AI Multilingual when available. Milestone 6 adds optional fixed-slot rows for persistent operational messages.
 
 Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plugin row links: Announcements, Settings, Deactivate.
 
@@ -23,6 +23,13 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.6.0 =
+* Fixed-slot announcement rows (M6): any announcement can be set to Fixed slot and shown above or below the rotating bar, outside the rotation.
+* At most one fixed announcement renders per position; the lowest priority (then the lowest ID) wins, losers are suppressed and never rotate.
+* An admin diagnostic and a non-blocking editor warning identify competing fixed announcements.
+* Fixed rows are composed inside the single WooCommerce Store Notice paragraph and inherit the host bar styling; no new colour settings.
+* Fixed rows use the existing schedule, template, free-shipping and AI Multilingual body-overlay behaviour unchanged; no migration and no schema change.
 
 = 0.5.2 =
 * Automatic updates from a private update server (bundled Plugin Update Checker v5); base URL read from the PRIVATE_UPDATE_SERVER constant, inert when it is not defined.

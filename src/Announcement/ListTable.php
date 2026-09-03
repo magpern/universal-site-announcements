@@ -68,6 +68,7 @@ final class ListTable {
 				$new['usa_priority'] = __( 'Priority', 'universal-site-announcements' );
 				$new['usa_schedule'] = __( 'Schedule', 'universal-site-announcements' );
 				$new['usa_source']   = __( 'Source', 'universal-site-announcements' );
+				$new['usa_mode']     = __( 'Mode', 'universal-site-announcements' );
 			}
 		}
 		return $new;
@@ -108,6 +109,10 @@ final class ListTable {
 				echo esc_html( $this->format_schedule( $post_id ) );
 				break;
 
+			case 'usa_mode':
+				echo esc_html( self::format_mode( $post_id ) );
+				break;
+
 			case 'usa_source':
 				$post     = get_post( $post_id );
 				$body     = $post ? (string) $post->post_content : '';
@@ -121,6 +126,25 @@ final class ListTable {
 				}
 				break;
 		}
+	}
+
+	/**
+	 * Human-readable display mode for the list table.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public static function format_mode( int $post_id ): string {
+		$display = DisplayMode::resolve( $post_id );
+
+		if ( DisplayMode::MODE_FIXED !== $display['mode'] ) {
+			return __( 'Rotating', 'universal-site-announcements' );
+		}
+
+		if ( DisplayMode::PLACEMENT_BELOW === $display['placement'] ) {
+			return __( 'Fixed (below)', 'universal-site-announcements' );
+		}
+
+		return __( 'Fixed (above)', 'universal-site-announcements' );
 	}
 
 	/**

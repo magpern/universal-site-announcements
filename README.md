@@ -9,7 +9,9 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 
 ## Status
 
-**M1**–**M5** are implemented. **0.5.1** makes render diagnostics dismissible and auto-clears overlay merge-tag mismatch warnings only when the same announcement recovers.
+**M1**–**M6** are implemented. **0.6.0** adds fixed-slot announcement rows (see below).
+
+**0.5.1** makes render diagnostics dismissible and auto-clears overlay merge-tag mismatch warnings only when the same announcement recovers.
 
 **0.5.0** adds optional Universal Multilingual (AIML) template-body overlays for visitor-facing announcements when AIML ≥ 1.7.0 with public descriptor factory (1.8.0+) is available; source templates remain the fallback.
 
@@ -72,6 +74,7 @@ Defaults preserve M2 behaviour: rotation on, 8 s interval, 600 ms fade.
 | Plugin deactivated | Upstream WooCommerce notice unchanged; USA data retained |
 | Rotation off + multiple active | Highest-priority message only (no JS/shell) |
 | One message / no-JS / reduced-motion | Static highest-priority message |
+| Fixed-slot announcement eligible | Static row above and/or below the rotating content, inside the same notice |
 
 USA never reads/writes `woocommerce_demo_store` or `woocommerce_demo_store_notice` as its own on/off switch, and never mutates shipping configuration or theme files.
 
@@ -84,6 +87,28 @@ USA never reads/writes `woocommerce_demo_store` or `woocommerce_demo_store_notic
 | Weekly recurring | Selected ISO weekdays, all day in the site timezone; optional `Weekly starts on` / `Weekly ends after` (`Y-m-d` local dates) |
 
 Weekly activity requires both a selected local weekday and a local date inside the optional window (absent bounds = indefinite). Invalid stored schedule data suppresses the announcement (never silently “Always”).
+
+## Fixed-slot rows (M6)
+
+Any announcement can be switched from **Rotating** (default) to **Fixed slot** in
+the editor, with a position of **Above** or **Below** the rotating announcements.
+A fixed announcement is an ordinary announcement post: enabled state, priority,
+schedule, template validation, free-shipping uniqueness and AI Multilingual body
+overlays all behave exactly as they do for rotating announcements.
+
+| Rule | Behaviour |
+|------|-----------|
+| Rotation | Fixed announcements never take part in the rotation and never fall back into it |
+| One per position | At most one fixed announcement renders per position; lowest priority, then lowest ID, wins |
+| Losing candidates | Suppressed, with an admin diagnostic and a non-blocking editor warning listing the competitors |
+| Nothing eligible | No row is rendered — never an empty row |
+| Markup | Composed inside the single `woocommerce-store-notice demo_store` paragraph as `span.usa-announcement-fixed`; the host's attributes are preserved |
+| Styling | Inherits the host Store Notice colours and typography; the plugin owns block layout and a `currentColor` separator only |
+| Motion | Static server-rendered content: no animation, no transition, unchanged reduced-motion and no-JS behaviour |
+
+Existing announcements are unaffected: the display-mode meta defaults to
+`rotating` at read time, so no migration runs and downgrading to 0.5.x simply
+returns fixed announcements to the rotation.
 
 ## Development
 
