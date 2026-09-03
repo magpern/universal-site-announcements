@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace USA\Admin;
 
 use USA\Announcement\DisplayMode;
+use USA\Announcement\FixedRowStyle;
 use USA\Announcement\PostType;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\ScheduleEvaluator;
@@ -274,6 +275,7 @@ final class AnnouncementMetaBoxes {
 		$display      = DisplayMode::resolve( (int) $post->ID );
 		$display_mode = $display['mode'];
 		$placement    = $display['placement'] ?? DisplayMode::PLACEMENT_ABOVE;
+		$style        = FixedRowStyle::resolve( (int) $post->ID );
 
 		$weekly_starts = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKLY_STARTS_ON, true );
 		$weekly_ends   = (string) get_post_meta( $post->ID, ScheduleEvaluator::META_WEEKLY_ENDS_ON, true );
@@ -323,6 +325,37 @@ final class AnnouncementMetaBoxes {
 			<p class="description">
 				<?php echo esc_html__( 'Only one fixed announcement is shown per position. If several are active at the same time, the lowest priority (then the lowest ID) wins. Enabled, schedule and template rules still apply.', 'universal-site-announcements' ); ?>
 			</p>
+
+			<fieldset class="usa-fixed-style" style="margin:12px 0;padding:8px 0;border-top:1px solid #dcdcde;">
+				<legend style="font-weight:600;padding:0;">
+					<?php echo esc_html__( 'Row colour (optional)', 'universal-site-announcements' ); ?>
+				</legend>
+				<p class="description" style="margin:0 0 8px;">
+					<?php echo esc_html__( 'Leave a field unchecked to inherit the existing Store Notice styling. Colours apply only to this row.', 'universal-site-announcements' ); ?>
+				</p>
+				<?php
+				$style_fields = array(
+					'bg'     => array( 'usa_fixed_bg', __( 'Background', 'universal-site-announcements' ) ),
+					'fg'     => array( 'usa_fixed_fg', __( 'Text', 'universal-site-announcements' ) ),
+					'link'   => array( 'usa_fixed_link', __( 'Links', 'universal-site-announcements' ) ),
+					'border' => array( 'usa_fixed_border', __( 'Border / separator', 'universal-site-announcements' ) ),
+				);
+				foreach ( $style_fields as $field => $field_def ) :
+					list( $name, $label ) = $field_def;
+					$value                = $style[ $field ];
+					$enabled              = null !== $value;
+					$hex                  = $enabled ? $value : '#ffffff';
+					?>
+					<p class="usa-fixed-style-field" style="margin:6px 0;display:flex;align-items:center;gap:6px;">
+						<label style="min-width:9em;">
+							<input type="checkbox" class="usa-color-toggle" data-usa-color-toggle="<?php echo esc_attr( $name ); ?>" name="<?php echo esc_attr( $name . '_enabled' ); ?>" value="1" <?php checked( $enabled ); ?> />
+							<?php echo esc_html( $label ); ?>
+						</label>
+						<input type="color" id="<?php echo esc_attr( $name ); ?>" name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $hex ); ?>" <?php disabled( ! $enabled ); ?> />
+					</p>
+				<?php endforeach; ?>
+				<p class="description usa-contrast-warning" id="usa-contrast-warning" role="status" hidden></p>
+			</fieldset>
 		</div>
 
 		<fieldset class="usa-schedule-mode" style="margin:12px 0;padding:8px 0;border-top:1px solid #dcdcde;">
@@ -649,6 +682,19 @@ final class AnnouncementMetaBoxes {
 		if ( null !== $display['placement'] ) {
 			update_post_meta( $post_id, DisplayMode::META_PLACEMENT, $display['placement'] );
 		}
+
+		// Fixed-row colour style (M6.1): each field only submitted when its
+		// checkbox is checked (disabled colour inputs are never submitted),
+		// so an absent field here means "inherit host styling" by construction.
+		$style = FixedRowStyle::normalize(
+			array(
+				'bg'     => isset( $_POST['usa_fixed_bg_enabled'], $_POST['usa_fixed_bg'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_fixed_bg'] ) ) : '',
+				'fg'     => isset( $_POST['usa_fixed_fg_enabled'], $_POST['usa_fixed_fg'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_fixed_fg'] ) ) : '',
+				'link'   => isset( $_POST['usa_fixed_link_enabled'], $_POST['usa_fixed_link'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_fixed_link'] ) ) : '',
+				'border' => isset( $_POST['usa_fixed_border_enabled'], $_POST['usa_fixed_border'] ) ? sanitize_text_field( wp_unslash( $_POST['usa_fixed_border'] ) ) : '',
+			)
+		);
+		FixedRowStyle::persist( $post_id, $style );
 
 		$tz = $this->schedule->site_timezone_string();
 

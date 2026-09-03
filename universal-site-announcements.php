@@ -3,7 +3,7 @@
  * Plugin Name:       Universal Site Announcements
  * Plugin URI:        https://github.com/magpern/universal-site-announcements
  * Description:       Generic site-wide announcement bar with safe inline links. Integrates with the WooCommerce Store Notice seam when WooCommerce is active.
- * Version:           0.6.1
+ * Version:           0.6.2
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            magpern
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'USA_VERSION', '0.6.1' );
+define( 'USA_VERSION', '0.6.2' );
 define( 'USA_PLUGIN_FILE', __FILE__ );
 define( 'USA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'USA_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );

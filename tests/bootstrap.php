@@ -188,6 +188,25 @@ if ( ! function_exists( 'esc_url' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_hex_color' ) ) {
+	/**
+	 * Faithful reimplementation of WordPress core's sanitize_hex_color()
+	 * (wp-includes/formatting.php): 3- or 6-digit hex only, "#" required.
+	 *
+	 * @param string $color Candidate colour string.
+	 * @return string|null
+	 */
+	function sanitize_hex_color( $color ) {
+		if ( '' === $color ) {
+			return '';
+		}
+		if ( preg_match( '|^#([A-Fa-f0-9]{3}){1,2}$|', (string) $color ) ) {
+			return $color;
+		}
+		return null;
+	}
+}
+
 if ( ! defined( 'USA_PLUGIN_BASENAME' ) ) {
 	define( 'USA_PLUGIN_BASENAME', 'universal-site-announcements/universal-site-announcements.php' );
 }
