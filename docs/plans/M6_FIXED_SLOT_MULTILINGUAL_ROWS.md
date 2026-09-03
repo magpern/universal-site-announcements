@@ -1,6 +1,6 @@
 # M6 — Fixed-Slot Multilingual Announcement Rows
 
-**Status:** DRAFT — pending PO approval  
+**Status:** FROZEN — PO APPROVED  
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Plugin:** Universal Site Announcements (`universal-site-announcements`)  
 **Namespace:** `USA\`  
@@ -11,7 +11,7 @@
 **AIML prerequisite:** `AimlCompatibility::MIN_AIML_VERSION = '1.7.0'` (unchanged); DEV runs Universal Multilingual 1.11.0  
 **Recommended implementation version:** **0.6.0**  
 **Implementation branch:** `feature/m6-fixed-slot-multilingual-rows` (from the post-freeze `main`)  
-**Drafted:** 2026-09-03
+**Frozen:** 2026-09-03
 
 ---
 
@@ -441,7 +441,7 @@ Cleanup / restoration: trash and permanently delete the `M6-ACC` posts; delete t
 
 ---
 
-## 14. Architecture decisions (proposed, to be locked at freeze)
+## 14. Architecture decisions (locked at freeze)
 
 | Topic | Decision |
 |---|---|
@@ -464,13 +464,13 @@ Cleanup / restoration: trash and permanently delete the `M6-ACC` posts; delete t
 
 ---
 
-## 16. Remaining PO decisions (genuine)
+## 16. PO decisions (approved 2026-09-03)
 
-| Decision | Recommendation |
+| Decision | Approved outcome |
 |---|---|
-| A. Per-announcement text/background colour controls | **Exclude from M6** (would reverse MASTER_PLAN §6 CSS ownership; separate milestone if wanted). Fixed rows inherit host styling. |
-| B. Collision handling | **Runtime suppression + diagnostic + non-blocking editor warning** (disjoint schedules on one placement stay legitimate). |
-| C. Version and baseline | **0.6.0** on top of `origin/main` 0.5.2; DEV must be updated to 0.5.2 (incl. vendor) before M6 acceptance. |
+| A. Per-announcement text/background colour controls | **APPROVED — excluded from M6** (would reverse MASTER_PLAN §6 CSS ownership; separate milestone if wanted). Fixed rows inherit host styling. |
+| B. Collision handling | **APPROVED — runtime suppression + diagnostic + non-blocking editor warning** (disjoint schedules on one placement stay legitimate). |
+| C. Version and baseline | **APPROVED — 0.6.0** on top of `origin/main` 0.5.2; DEV must be updated to 0.5.2 (incl. vendor) before M6 acceptance. |
 
 ---
 
@@ -479,3 +479,4 @@ Cleanup / restoration: trash and permanently delete the `M6-ACC` posts; delete t
 | Version | Date | Notes |
 |---|---|---|
 | 0.1-draft | 2026-09-03 | Initial draft from architecture audit at `d752309e`; pending PO approval. |
+| 1.0-frozen | 2026-09-03 | PO approved decisions A–C (§16); plan frozen. Implementation branch `feature/m6-fixed-slot-multilingual-rows`. |
