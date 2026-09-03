@@ -37,9 +37,21 @@ final class DiagnosticsNotice {
 	 * Register admin notice and dismiss handlers.
 	 */
 	public function register(): void {
+		add_action( 'admin_init', array( $this, 'ensure_store_notice_gate_if_enabled' ), 5 );
 		add_action( 'admin_notices', array( $this, 'render' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'maybe_enqueue_dismiss_script' ) );
 		add_action( 'wp_ajax_' . self::AJAX_ACTION, array( $this, 'ajax_dismiss' ) );
+	}
+
+	/**
+	 * Ensure WooCommerce Store Notice gate is enabled when USA is enabled globally.
+	 *
+	 * Runs on every admin page load at priority 5 (before other hooks).
+	 * If USA is enabled and there are eligible announcements, ensures the WooCommerce
+	 * Store Notice option is enabled so announcements can render.
+	 */
+	public function ensure_store_notice_gate_if_enabled(): void {
+		\USA\Announcement\StoreNoticeGate::ensure_gate_enabled_if_needed();
 	}
 
 	/**
