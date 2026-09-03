@@ -92,14 +92,16 @@ final class SettingsPage {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'Announcement Settings', 'universal-site-announcements' ); ?></h1>
-			<p>
-				<?php
-				echo esc_html__(
-					'When announcements are enabled, this plugin owns Store Notice content. With no active announcements, the bar is hidden. Disable the setting or deactivate the plugin to restore the WooCommerce store notice text. This plugin never changes WooCommerce store-notice options.',
-					'universal-site-announcements'
-				);
-				?>
-			</p>
+			<?php if ( Settings::is_enabled() ) : ?>
+				<p>
+					<?php
+					echo esc_html__(
+						'When announcements are enabled, this plugin owns Store Notice content. With no active announcements, the bar is hidden. Disable the setting or deactivate the plugin to restore the WooCommerce store notice text. This plugin never changes WooCommerce store-notice options.',
+						'universal-site-announcements'
+					);
+					?>
+				</p>
+			<?php endif; ?>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'usa_settings_group' ); ?>
 				<table class="form-table" role="presentation">
