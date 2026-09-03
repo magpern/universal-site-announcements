@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 require dirname( __DIR__ ) . '/vendor/autoload.php';
+require_once __DIR__ . '/support/AnnouncementFixture.php';
 
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', '/tmp/' );
@@ -193,6 +194,13 @@ $GLOBALS['usa_test_post_ids'] = array();
  */
 $GLOBALS['usa_test_timezone'] = 'UTC';
 
+/**
+ * Post content keyed by post ID for the get_posts() stub.
+ *
+ * @var array<int, string>
+ */
+$GLOBALS['usa_test_post_content'] = array();
+
 if ( ! function_exists( 'get_post_meta' ) ) {
 	/**
 	 * @param int    $post_id Post ID.
@@ -281,14 +289,45 @@ if ( ! function_exists( 'get_posts' ) ) {
 		if ( 'ids' === $fields ) {
 			return array_map( 'intval', $ids );
 		}
-		$out = array();
+		$content = isset( $GLOBALS['usa_test_post_content'] ) && is_array( $GLOBALS['usa_test_post_content'] )
+			? $GLOBALS['usa_test_post_content']
+			: array();
+		$out     = array();
 		foreach ( $ids as $id ) {
 			$out[] = (object) array(
 				'ID'           => (int) $id,
-				'post_content' => '',
+				'post_content' => isset( $content[ (int) $id ] ) ? (string) $content[ (int) $id ] : '',
 			);
 		}
 		return $out;
+	}
+}
+
+/**
+ * @var array<string, array<string, mixed>>
+ */
+$GLOBALS['usa_test_registered_post_types'] = array();
+
+if ( ! function_exists( 'register_post_type' ) ) {
+	/**
+	 * @param string               $post_type Post type key.
+	 * @param array<string, mixed> $args      Arguments.
+	 * @return object
+	 */
+	function register_post_type( $post_type, $args = array() ) {
+		$GLOBALS['usa_test_registered_post_types'][ (string) $post_type ] = $args;
+		return (object) array( 'name' => (string) $post_type );
+	}
+}
+
+if ( ! function_exists( 'flush_rewrite_rules' ) ) {
+	/**
+	 * @param bool $hard Hard flush.
+	 */
+	function flush_rewrite_rules( $hard = true ): bool {
+		unset( $hard );
+		$GLOBALS['usa_test_rewrite_flushed'] = true;
+		return true;
 	}
 }
 

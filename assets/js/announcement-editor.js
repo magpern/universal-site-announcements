@@ -149,6 +149,23 @@
 		});
 		syncSchedulePanels();
 
+		function syncDisplayPanels() {
+			var displayInput = document.querySelector('input[name="usa_display_mode"]:checked');
+			var displayMode = displayInput ? displayInput.value : 'rotating';
+			document.querySelectorAll('.usa-display-panel').forEach(function (panel) {
+				var panelMode = panel.getAttribute('data-usa-display');
+				if (panelMode === displayMode) {
+					panel.removeAttribute('hidden');
+				} else {
+					panel.setAttribute('hidden', 'hidden');
+				}
+			});
+		}
+		document.querySelectorAll('input[name="usa_display_mode"]').forEach(function (el) {
+			el.addEventListener('change', syncDisplayPanels);
+		});
+		syncDisplayPanels();
+
 		document.querySelectorAll('.usa-insert-token').forEach(function (btn) {
 			btn.addEventListener('click', function () {
 				insertAtCursor(btn.getAttribute('data-token') || '');

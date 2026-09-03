@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace USA\Rendering;
 
+use USA\Announcement\DisplayMode;
 use USA\Announcement\Sanitizer;
 use USA\Announcement\Selector;
 use USA\Admin\DiagnosticsNotice;
@@ -69,7 +70,7 @@ final class StoreNoticeRenderer {
 	 *
 	 * Requires two or more active messages and rotation enabled in settings.
 	 *
-	 * @param int $active_count Active announcement count.
+	 * @param int $active_count Active rotating announcement count.
 	 */
 	public static function should_rotate( int $active_count ): bool {
 		return $active_count >= 2 && Settings::is_rotation_enabled();
@@ -92,20 +93,23 @@ final class StoreNoticeRenderer {
 			return $html;
 		}
 
-		$contents = $this->selector->active_contents();
-		$count    = count( $contents );
+		$set      = $this->selector->render_set();
+		$rotating = $set['rotating'];
+		$count    = count( $rotating );
 
-		if ( 0 === $count ) {
-			return '';
-		}
+		$above = $this->fixed_fragment( $set['fixed'][ DisplayMode::PLACEMENT_ABOVE ], DisplayMode::PLACEMENT_ABOVE );
+		$below = $this->fixed_fragment( $set['fixed'][ DisplayMode::PLACEMENT_BELOW ], DisplayMode::PLACEMENT_BELOW );
 
-		// Single message, or rotation disabled → highest priority only; no shell/JS.
-		if ( ! self::should_rotate( $count ) ) {
-			$inner = $this->sanitizer->sanitize_output( $contents[0] );
-			if ( '' === $inner ) {
+		$rotate = self::should_rotate( $count );
+
+		if ( ! $rotate ) {
+			$inner = 0 === $count ? '' : $this->sanitizer->sanitize_output( (string) $rotating[0]['content'] );
+			if ( '' === $inner && null === $above && null === $below ) {
 				return '';
 			}
-			$result = $this->replacer->replace( $html, $inner );
+
+			$composed = $this->replacer->compose( $above, $inner, $below );
+			$result   = $this->replacer->replace( $html, $composed );
 			if ( ! $result['ok'] ) {
 				DiagnosticsNotice::record_failure( (string) $result['error'] );
 				return $html;
@@ -114,8 +118,8 @@ final class StoreNoticeRenderer {
 		}
 
 		$spans = array();
-		foreach ( $contents as $index => $content ) {
-			$safe = $this->sanitizer->sanitize_output( $content );
+		foreach ( $rotating as $index => $row ) {
+			$safe = $this->sanitizer->sanitize_output( (string) $row['content'] );
 			if ( '' === $safe ) {
 				continue;
 			}
@@ -123,16 +127,21 @@ final class StoreNoticeRenderer {
 			$spans[] = '<span class="' . esc_attr( $class ) . '">' . $safe . '</span>';
 		}
 
-		if ( array() === $spans ) {
+		if ( array() === $spans && null === $above && null === $below ) {
 			return '';
 		}
 
 		// No-JS / reduced-motion: first message remains is-active; others hidden via CSS.
-		$inner  = implode( '', $spans );
-		$result = $this->replacer->replace( $html, $inner );
+		$inner    = implode( '', $spans );
+		$composed = $this->replacer->compose( $above, $inner, $below );
+		$result   = $this->replacer->replace( $html, $composed );
 		if ( ! $result['ok'] ) {
 			DiagnosticsNotice::record_failure( (string) $result['error'] );
 			return $html;
+		}
+
+		if ( array() === $spans ) {
+			return $result['html'];
 		}
 
 		$pause_label  = __( 'Pause announcements', 'universal-site-announcements' );
@@ -148,6 +157,26 @@ final class StoreNoticeRenderer {
 	}
 
 	/**
+	 * Sanitised markup for one fixed-slot row, or null when there is nothing to show.
+	 *
+	 * @param array<string,mixed>|null $row       Winning fixed row.
+	 * @param string                   $placement Placement (above|below).
+	 */
+	private function fixed_fragment( ?array $row, string $placement ): ?string {
+		if ( null === $row ) {
+			return null;
+		}
+
+		$safe = $this->sanitizer->sanitize_output( (string) $row['content'] );
+		if ( '' === $safe ) {
+			return null;
+		}
+
+		return '<span class="' . esc_attr( 'usa-announcement-fixed usa-announcement-fixed--' . $placement ) . '"'
+			. ' data-usa-fixed="' . esc_attr( $placement ) . '">' . $safe . '</span>';
+	}
+
+	/**
 	 * Enqueue rotation CSS/JS when the multi-message rotation path is active.
 	 *
 	 * Runs on wp_enqueue_scripts (before the notice filter) so assets can print.
@@ -157,8 +186,12 @@ final class StoreNoticeRenderer {
 			return;
 		}
 
-		$count = count( $this->selector->active_contents() );
-		if ( ! self::should_rotate( $count ) ) {
+		$set       = $this->selector->render_set();
+		$rotate    = self::should_rotate( count( $set['rotating'] ) );
+		$has_fixed = null !== $set['fixed'][ DisplayMode::PLACEMENT_ABOVE ]
+			|| null !== $set['fixed'][ DisplayMode::PLACEMENT_BELOW ];
+
+		if ( ! $rotate && ! $has_fixed ) {
 			return;
 		}
 
@@ -173,6 +206,10 @@ final class StoreNoticeRenderer {
 			array(),
 			$version
 		);
+
+		if ( ! $rotate ) {
+			return;
+		}
 
 		wp_add_inline_style(
 			'usa-announcement-bar',
