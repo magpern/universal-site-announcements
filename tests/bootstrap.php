@@ -147,6 +147,19 @@ if ( ! function_exists( 'update_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'delete_option' ) ) {
+	/**
+	 * @param string $key Option key.
+	 */
+	function delete_option( $key ): bool {
+		if ( ! isset( $GLOBALS['usa_test_options'] ) || ! is_array( $GLOBALS['usa_test_options'] ) ) {
+			return true;
+		}
+		unset( $GLOBALS['usa_test_options'][ (string) $key ] );
+		return true;
+	}
+}
+
 if ( ! function_exists( 'admin_url' ) ) {
 	/**
 	 * @param string $path Path.
@@ -275,6 +288,11 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+/**
+ * @var array<int, string>
+ */
+$GLOBALS['usa_test_post_types'] = array();
+
 if ( ! function_exists( 'get_posts' ) ) {
 	/**
 	 * @param array<string, mixed> $args Args.
@@ -284,6 +302,28 @@ if ( ! function_exists( 'get_posts' ) ) {
 		$ids = isset( $GLOBALS['usa_test_post_ids'] ) && is_array( $GLOBALS['usa_test_post_ids'] )
 			? $GLOBALS['usa_test_post_ids']
 			: array();
+		
+		// If no explicit IDs, infer from content keys.
+		if ( empty( $ids ) && isset( $GLOBALS['usa_test_post_content'] ) && is_array( $GLOBALS['usa_test_post_content'] ) ) {
+			$ids = array_keys( $GLOBALS['usa_test_post_content'] );
+		}
+		
+		// Filter by post_type if specified (default to match all if not set).
+		if ( isset( $args['post_type'] ) ) {
+			$post_type = (string) $args['post_type'];
+			$types = isset( $GLOBALS['usa_test_post_types'] ) && is_array( $GLOBALS['usa_test_post_types'] )
+				? $GLOBALS['usa_test_post_types']
+				: array();
+			$filtered_ids = array();
+			foreach ( $ids as $id ) {
+				// If post type is not set for this post, assume it matches.
+				if ( ! isset( $types[ (int) $id ] ) || $types[ (int) $id ] === $post_type ) {
+					$filtered_ids[] = $id;
+				}
+			}
+			$ids = $filtered_ids;
+		}
+		
 		sort( $ids, SORT_NUMERIC );
 		$fields = isset( $args['fields'] ) ? (string) $args['fields'] : '';
 		if ( 'ids' === $fields ) {

@@ -12,15 +12,19 @@ namespace USA\Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use USA\Announcement\StoreNoticeGate;
 use USA\Settings;
+use USA\Tests\Support\AnnouncementFixture;
 
 /**
  * @covers \USA\Announcement\StoreNoticeGate
  */
 final class StoreNoticeGateTest extends TestCase {
 
+	use AnnouncementFixture;
+
 	private array $original_options = array();
 
 	protected function setUp(): void {
+		$this->reset_world();
 		$this->original_options = array(
 			'usa_plugin_enabled'        => get_option( 'usa_plugin_enabled' ),
 			'woocommerce_demo_store'    => get_option( 'woocommerce_demo_store' ),
@@ -79,23 +83,14 @@ final class StoreNoticeGateTest extends TestCase {
 
 	public function test_has_eligible_announcements_returns_false_for_disabled_announcements(): void {
 		// Simulate a published announcement without _usa_enabled meta.
-		$GLOBALS['usa_test_post_content'] = array(
-			42 => 'Test content',
-		);
+		$this->add_announcement( 42, 'Test content', array( '_usa_enabled' => '' ) );
 
 		$this->assertFalse( StoreNoticeGate::has_eligible_announcements() );
 	}
 
 	public function test_has_eligible_announcements_returns_true_for_enabled_announcements(): void {
 		// Simulate a published announcement with _usa_enabled = 1.
-		$GLOBALS['usa_test_post_content'] = array(
-			42 => 'Test content',
-		);
-		$GLOBALS['usa_test_post_meta'] = array(
-			42 => array(
-				'_usa_enabled' => '1',
-			),
-		);
+		$this->add_announcement( 42, 'Test content' );
 
 		$this->assertTrue( StoreNoticeGate::has_eligible_announcements() );
 	}
@@ -140,14 +135,7 @@ final class StoreNoticeGateTest extends TestCase {
 		Settings::set_enabled( true );
 		update_option( 'woocommerce_demo_store', 'no' );
 
-		$GLOBALS['usa_test_post_content'] = array(
-			42 => 'Test content',
-		);
-		$GLOBALS['usa_test_post_meta'] = array(
-			42 => array(
-				'_usa_enabled' => '1',
-			),
-		);
+		$this->add_announcement( 42, 'Test content' );
 
 		StoreNoticeGate::maybe_record_gate_blocked_diagnostic();
 
@@ -160,14 +148,7 @@ final class StoreNoticeGateTest extends TestCase {
 		Settings::set_enabled( true );
 		update_option( 'woocommerce_demo_store', 'no' );
 
-		$GLOBALS['usa_test_post_content'] = array(
-			42 => 'Test content',
-		);
-		$GLOBALS['usa_test_post_meta'] = array(
-			42 => array(
-				'_usa_enabled' => '1',
-			),
-		);
+		$this->add_announcement( 42, 'Test content' );
 
 		// Record the diagnostic.
 		StoreNoticeGate::maybe_record_gate_blocked_diagnostic();

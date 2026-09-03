@@ -39,6 +39,8 @@ final class StoreNoticeGate {
 
 		$current = get_option( self::WOO_OPTION_KEY, 'no' );
 		if ( 'yes' === (string) $current ) {
+			// Gate is enabled, clear any previous gate_disabled diagnostic.
+			\USA\Admin\DiagnosticsNotice::clear();
 			return;
 		}
 
@@ -98,6 +100,8 @@ final class StoreNoticeGate {
 
 		$current = get_option( self::WOO_OPTION_KEY, 'no' );
 		if ( 'yes' === (string) $current ) {
+			// Gate is enabled, clear any previous gate_disabled diagnostic.
+			\USA\Admin\DiagnosticsNotice::clear();
 			return;
 		}
 
