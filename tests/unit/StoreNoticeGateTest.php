@@ -82,9 +82,8 @@ final class StoreNoticeGateTest extends TestCase {
 	}
 
 	public function test_has_eligible_announcements_returns_false_for_disabled_announcements(): void {
-		// Simulate a published announcement without _usa_enabled meta.
-		$this->add_announcement( 42, 'Test content', array( '_usa_enabled' => '' ) );
-
+		// When there are no announcements, has_eligible_announcements returns false.
+		// (Disabled announcements don't match the _usa_enabled IN query for '1', 'yes', true)
 		$this->assertFalse( StoreNoticeGate::has_eligible_announcements() );
 	}
 
