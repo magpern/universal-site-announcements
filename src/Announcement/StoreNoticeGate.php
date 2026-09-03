@@ -46,10 +46,12 @@ final class StoreNoticeGate {
 	}
 
 	/**
-	 * Whether any eligible announcements exist.
+	 * Whether any enabled and published announcements exist.
 	 *
-	 * Uses the same eligibility rules as Repository::get_active()
-	 * without requiring the full Repository instantiation.
+	 * Quick check used to enable the gate optimistically. The gate is enabled
+	 * when an admin marks an announcement as enabled, even if its schedule or
+	 * template is currently invalid. The diagnostic will only appear if the
+	 * announcement is actually eligible to render (valid schedule + template).
 	 *
 	 * @return bool True if at least one enabled and published announcement exists.
 	 */
