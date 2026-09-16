@@ -20,6 +20,8 @@ final class SourceTokenRules {
 
 	public const TOKEN_PRODUCT = 'product';
 
+	public const TOKEN_PAGE = 'page';
+
 	/**
 	 * Validate token structure independent of persisted source.
 	 *
@@ -46,6 +48,13 @@ final class SourceTokenRules {
 			if ( self::TOKEN_PRODUCT === $token->name ) {
 				if ( null === $token->arg || ! $this->is_positive_int_string( $token->arg ) ) {
 					return 'invalid_product_token';
+				}
+				continue;
+			}
+
+			if ( self::TOKEN_PAGE === $token->name ) {
+				if ( null === $token->arg || ! $this->is_positive_int_string( $token->arg ) ) {
+					return 'invalid_page_token';
 				}
 				continue;
 			}
@@ -107,7 +116,7 @@ final class SourceTokenRules {
 	 * @return list<string>
 	 */
 	public function insertable_names(): array {
-		return array( self::TOKEN_FREE_SHIPPING, self::TOKEN_PRODUCT );
+		return array( self::TOKEN_FREE_SHIPPING, self::TOKEN_PRODUCT, self::TOKEN_PAGE );
 	}
 
 	/**

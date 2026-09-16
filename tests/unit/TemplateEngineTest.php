@@ -16,6 +16,7 @@ use USA\Provider\UmcThresholdDisplay;
 use USA\Template\FreeShippingThresholdToken;
 use USA\Template\HtmlPlacementValidator;
 use USA\Template\MergeTagParser;
+use USA\Template\PageToken;
 use USA\Template\ProductToken;
 use USA\Template\SourceTokenRules;
 use USA\Template\TemplateEngine;
@@ -223,6 +224,67 @@ final class TemplateEngineTest extends TestCase {
 			array(
 				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),
 				new ProductToken( $resolver ),
+			)
+		);
+	}
+
+	/**
+	 * Page token renders a safe link, resolved via the page resolver (mirrors
+	 * `get_permalink()` at runtime, which is what lets a routing layer such as
+	 * a multilingual plugin localize the URL for the current language).
+	 */
+	public function test_page_token_link(): void {
+		$engine = $this->engine_with_page(
+			static function ( int $id ) {
+				return array(
+					'title' => 'How to pay with crypto',
+					'url'   => 'https://example.test/sv/hur-man-betalar-med-krypto/',
+				);
+			}
+		);
+
+		$out = $engine->render( 'See {{page:8121}} for details', 'manual' );
+		$this->assertSame(
+			'See <a href="https://example.test/sv/hur-man-betalar-med-krypto/">How to pay with crypto</a> for details',
+			$out
+		);
+	}
+
+	/**
+	 * Missing page suppresses.
+	 */
+	public function test_missing_page_suppresses(): void {
+		$engine = $this->engine_with_page(
+			static function ( int $id ) {
+				return null;
+			}
+		);
+
+		$this->assertNull( $engine->render( 'See {{page:99}}', 'manual' ) );
+	}
+
+	/**
+	 * @param callable(int):(?array{title:string,url:string}) $resolver Page resolver.
+	 */
+	private function engine_with_page( callable $resolver ): TemplateEngine {
+		$sanitizer = new Sanitizer();
+		$activity  = new UmcActivity(
+			static function (): bool {
+				return false;
+			}
+		);
+		$umc = new UmcThresholdDisplay();
+
+		return new TemplateEngine(
+			new TemplateRequirements(
+				new MergeTagParser(),
+				new HtmlPlacementValidator(),
+				new SourceTokenRules()
+			),
+			$sanitizer,
+			array(
+				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),
+				new PageToken( $resolver ),
 			)
 		);
 	}

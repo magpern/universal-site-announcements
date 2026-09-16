@@ -108,6 +108,7 @@ final class AnnouncementMetaBoxes {
 		add_action( 'admin_notices', array( $this, 'render_fixed_collision_notice' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_editor_assets' ) );
 		add_action( 'wp_ajax_usa_search_products', array( $this, 'ajax_search_products' ) );
+		add_action( 'wp_ajax_usa_search_pages', array( $this, 'ajax_search_pages' ) );
 	}
 
 	/**
@@ -460,11 +461,19 @@ final class AnnouncementMetaBoxes {
 			<button type="button" class="button usa-insert-product" id="usa-insert-product">
 				<?php echo esc_html__( 'Product link…', 'universal-site-announcements' ); ?>
 			</button>
+			<button type="button" class="button usa-insert-page" id="usa-insert-page">
+				<?php echo esc_html__( 'Page link…', 'universal-site-announcements' ); ?>
+			</button>
 		</p>
 		<div id="usa-product-picker" hidden style="margin-top:8px;">
 			<label for="usa-product-search"><?php echo esc_html__( 'Search products', 'universal-site-announcements' ); ?></label>
 			<input type="search" id="usa-product-search" class="regular-text" autocomplete="off" />
 			<ul id="usa-product-results" style="margin:8px 0;max-height:180px;overflow:auto;"></ul>
+		</div>
+		<div id="usa-page-picker" hidden style="margin-top:8px;">
+			<label for="usa-page-search"><?php echo esc_html__( 'Search pages', 'universal-site-announcements' ); ?></label>
+			<input type="search" id="usa-page-search" class="regular-text" autocomplete="off" />
+			<ul id="usa-page-results" style="margin:8px 0;max-height:180px;overflow:auto;"></ul>
 		</div>
 		<p class="description">
 			<code>{{free_shipping_threshold}}</code>
@@ -474,6 +483,10 @@ final class AnnouncementMetaBoxes {
 			<code>{{product:123}}</code>
 			—
 			<?php echo esc_html__( 'Public product title linked to its current URL.', 'universal-site-announcements' ); ?>
+			<br />
+			<code>{{page:123}}</code>
+			—
+			<?php echo esc_html__( 'Page title linked to its current URL — use this instead of pasting a page URL, so a translated slug (e.g. a multilingual plugin) is picked up automatically.', 'universal-site-announcements' ); ?>
 		</p>
 		<?php
 	}
@@ -1012,6 +1025,41 @@ final class AnnouncementMetaBoxes {
 	}
 
 	/**
+	 * AJAX page search for the insert picker.
+	 */
+	public function ajax_search_pages(): void {
+		if ( ! current_user_can( Settings::manage_cap() ) ) {
+			wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+		}
+
+		check_ajax_referer( 'usa_search_products', 'nonce' );
+
+		$term = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		if ( '' === $term ) {
+			wp_send_json_success( array( 'pages' => array() ) );
+		}
+
+		$pages = get_posts(
+			array(
+				'post_type'      => 'page',
+				'post_status'    => 'publish',
+				'posts_per_page' => 20,
+				's'              => $term,
+			)
+		);
+
+		$out = array();
+		foreach ( $pages as $page ) {
+			$out[] = array(
+				'id'    => (int) $page->ID,
+				'title' => (string) get_the_title( $page ),
+			);
+		}
+
+		wp_send_json_success( array( 'pages' => $out ) );
+	}
+
+	/**
 	 * Whether another enabled free-shipping-dependent announcement exists (derived from template).
 	 *
 	 * @param int $post_id Current post ID.
@@ -1097,11 +1145,13 @@ final class AnnouncementMetaBoxes {
 			'malformed_merge_tags'          => __( 'Malformed merge tags (unmatched or invalid {{…}}).', 'universal-site-announcements' ),
 			'token_in_attribute'            => __( 'Merge tags are not allowed inside HTML attributes.', 'universal-site-announcements' ),
 			'product_token_inside_anchor'   => __( 'Product tokens cannot appear inside an existing link.', 'universal-site-announcements' ),
+			'page_token_inside_anchor'      => __( 'Page tokens cannot appear inside an existing link.', 'universal-site-announcements' ),
 			'token_not_in_text_node'        => __( 'Merge tags must appear in text content.', 'universal-site-announcements' ),
 			'free_shipping_token_forbidden' => __( 'Free-shipping threshold tokens are not allowed on manual announcements.', 'universal-site-announcements' ),
 			'free_shipping_token_count'     => __( 'Use exactly one {{free_shipping_threshold}} token (duplicates are not allowed).', 'universal-site-announcements' ),
 			'unknown_token'                 => __( 'Unknown merge tag.', 'universal-site-announcements' ),
 			'invalid_product_token'         => __( 'Invalid product token (use a positive numeric ID).', 'universal-site-announcements' ),
+			'invalid_page_token'            => __( 'Invalid page token (use a positive numeric ID).', 'universal-site-announcements' ),
 			'invalid_token_argument'        => __( 'Invalid token argument.', 'universal-site-announcements' ),
 		);
 

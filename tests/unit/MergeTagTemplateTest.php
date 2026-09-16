@@ -96,6 +96,30 @@ final class MergeTagTemplateTest extends TestCase {
 	}
 
 	/**
+	 * Page token inside existing &lt;a&gt; is rejected.
+	 */
+	public function test_page_inside_anchor_rejection(): void {
+		$parser    = new MergeTagParser();
+		$placement = new HtmlPlacementValidator();
+		$html      = '<a href="https://example.test/p">Read {{page:5}}</a>';
+		$parsed    = $parser->parse( $html );
+		$this->assertTrue( $parsed['ok'] );
+		$this->assertSame( 'page_token_inside_anchor', $placement->validate( $html, $parsed['tokens'] ) );
+	}
+
+	/**
+	 * Page inside strong (not anchor) is OK.
+	 */
+	public function test_page_in_strong_ok(): void {
+		$parser    = new MergeTagParser();
+		$placement = new HtmlPlacementValidator();
+		$html      = 'See <em>{{page:9}}</em> for details';
+		$parsed    = $parser->parse( $html );
+		$this->assertTrue( $parsed['ok'] );
+		$this->assertNull( $placement->validate( $html, $parsed['tokens'] ) );
+	}
+
+	/**
 	 * Tokens inside &lt;strong&gt; are allowed.
 	 */
 	public function test_tokens_in_strong_ok(): void {
@@ -148,5 +172,12 @@ final class MergeTagTemplateTest extends TestCase {
 
 		$dup_product = $parser->parse( '{{free_shipping_threshold}} {{product:1}} {{product:1}}' );
 		$this->assertNull( $rules->validate_structure( $dup_product['tokens'] ) );
+
+		$page = $parser->parse( 'See {{page:3}}' );
+		$this->assertNull( $rules->validate_structure( $page['tokens'] ) );
+		$this->assertFalse( $rules->requires_free_shipping( $page['tokens'] ) );
+
+		$bad_page = $parser->parse( '{{page:01}}' );
+		$this->assertFalse( $bad_page['ok'] );
 	}
 }

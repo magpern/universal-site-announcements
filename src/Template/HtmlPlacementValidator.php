@@ -25,6 +25,12 @@ namespace USA\Template;
 final class HtmlPlacementValidator {
 
 	/**
+	 * Token names whose resolved output is a link and so must not nest inside
+	 * an existing &lt;a&gt; (nested anchors are invalid HTML).
+	 */
+	private const LINK_TOKEN_NAMES = array( 'product', 'page' );
+
+	/**
 	 * Validate placement of already-parsed tokens within the template HTML.
 	 *
 	 * @param string       $template Template HTML.
@@ -90,7 +96,7 @@ final class HtmlPlacementValidator {
 		}
 
 		foreach ( $tokens as $token ) {
-			if ( 'product' !== $token->name ) {
+			if ( ! in_array( $token->name, self::LINK_TOKEN_NAMES, true ) ) {
 				continue;
 			}
 			foreach ( $text_nodes as $text_node ) {
@@ -109,7 +115,7 @@ final class HtmlPlacementValidator {
 						// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOM API.
 						$tag = strtolower( $parent->tagName );
 						if ( 'a' === $tag ) {
-							return 'product_token_inside_anchor';
+							return $token->name . '_token_inside_anchor';
 						}
 					}
 					// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOM API.
@@ -159,12 +165,12 @@ final class HtmlPlacementValidator {
 		}
 
 		foreach ( $tokens as $token ) {
-			if ( 'product' !== $token->name || null === $token->arg ) {
+			if ( ! in_array( $token->name, self::LINK_TOKEN_NAMES, true ) || null === $token->arg ) {
 				continue;
 			}
-			$pattern = '/<a\b[^>]*>.*?\{\{product:' . preg_quote( $token->arg, '/' ) . '\}\}.*?<\/a>/is';
+			$pattern = '/<a\b[^>]*>.*?\{\{' . preg_quote( $token->name, '/' ) . ':' . preg_quote( $token->arg, '/' ) . '\}\}.*?<\/a>/is';
 			if ( preg_match( $pattern, $template ) ) {
-				return 'product_token_inside_anchor';
+				return $token->name . '_token_inside_anchor';
 			}
 		}
 

@@ -131,6 +131,53 @@
 			});
 	}
 
+	function searchPages(q) {
+		var results = document.getElementById('usa-page-results');
+		if (!results || !window.usaAnnouncementEditor) {
+			return;
+		}
+		results.innerHTML = '<li>' + (usaAnnouncementEditor.i18n.searching || '') + '</li>';
+		var url =
+			usaAnnouncementEditor.ajaxUrl +
+			'?action=usa_search_pages&nonce=' +
+			encodeURIComponent(usaAnnouncementEditor.nonce) +
+			'&q=' +
+			encodeURIComponent(q);
+		fetch(url, { credentials: 'same-origin' })
+			.then(function (r) {
+				return r.json();
+			})
+			.then(function (payload) {
+				results.innerHTML = '';
+				var pages =
+					payload && payload.success && payload.data && payload.data.pages
+						? payload.data.pages
+						: [];
+				if (!pages.length) {
+					results.innerHTML =
+						'<li>' + (usaAnnouncementEditor.i18n.noResults || '') + '</li>';
+					return;
+				}
+				pages.forEach(function (p) {
+					var li = document.createElement('li');
+					var btn = document.createElement('button');
+					btn.type = 'button';
+					btn.className = 'button-link';
+					btn.textContent = p.title + ' (#' + p.id + ')';
+					btn.addEventListener('click', function () {
+						insertAtCursor('{{page:' + p.id + '}}');
+						document.getElementById('usa-page-picker').hidden = true;
+					});
+					li.appendChild(btn);
+					results.appendChild(li);
+				});
+			})
+			.catch(function () {
+				results.innerHTML =
+					'<li>' + (usaAnnouncementEditor.i18n.noResults || '') + '</li>';
+			});
+	}
+
 	document.addEventListener('DOMContentLoaded', function () {
 		function syncSchedulePanels() {
 			var modeInput = document.querySelector('input[name="usa_schedule_mode"]:checked');
@@ -285,6 +332,30 @@
 				}
 				timer = setTimeout(function () {
 					searchProducts(q);
+				}, 250);
+			});
+		}
+
+		var pageBtn = document.getElementById('usa-insert-page');
+		var pagePicker = document.getElementById('usa-page-picker');
+		var pageSearch = document.getElementById('usa-page-search');
+		if (pageBtn && pagePicker && pageSearch) {
+			pageBtn.addEventListener('click', function () {
+				pagePicker.hidden = !pagePicker.hidden;
+				if (!pagePicker.hidden) {
+					pageSearch.focus();
+				}
+			});
+			var pageTimer = null;
+			pageSearch.addEventListener('input', function () {
+				clearTimeout(pageTimer);
+				var q = pageSearch.value.trim();
+				if (q.length < 2) {
+					document.getElementById('usa-page-results').innerHTML = '';
+					return;
+				}
+				pageTimer = setTimeout(function () {
+					searchPages(q);
 				}, 250);
 			});
 		}
