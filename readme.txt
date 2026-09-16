@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.6.2
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,11 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.7.0 =
+* New `{{page:ID}}` merge tag with a "Page link…" picker in the editor (mirrors the existing "Product link…" picker): inserts a page title linked to its current URL, resolved via `get_permalink()` at render time. Use it instead of pasting a page URL directly — a page URL baked into the template as plain text can't pick up a routing layer's translated slug (e.g. Universal Multilingual), while a token resolved at render time does.
+* Placement rules extended to the new token: rejected inside an HTML attribute, and rejected nested inside an existing `<a>` (same as the product token).
+* New AJAX page search (`usa_search_pages`) reusing the existing product-search nonce; no new capability required.
 
 = 0.6.2 =
 * Optional per-fixed-row colour styling (M6.1): background, text, link, and border/separator colour for fixed-slot announcements only, via CSS custom properties on the row's own wrapper.
