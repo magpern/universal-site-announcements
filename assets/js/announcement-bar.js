@@ -2,13 +2,14 @@
  * Universal Site Announcements — accessible fade rotation.
  *
  * Interval and fade duration come from usaAnnouncementBar (wp_localize_script).
- * Pause via button + sessionStorage. No aria-live on automatic ticks.
- * Respects prefers-reduced-motion.
+ * No manual pause control: auto-advance pauses itself on hover, keyboard
+ * focus, and a hidden tab, and never starts when prefers-reduced-motion is
+ * set — each of those is itself a WCAG 2.2.2-compliant pause mechanism.
+ * No aria-live on automatic ticks.
  */
 (function () {
 	'use strict';
 
-	var STORAGE_KEY = 'usa_announcement_bar_paused';
 	var config = window.usaAnnouncementBar || {};
 	var INTERVAL_MS = parseInt(config.intervalMs, 10);
 	var FADE_MS = parseInt(config.fadeMs, 10);
@@ -37,38 +38,11 @@
 			return;
 		}
 
-		var toggle = shell.querySelector('.usa-announcement-bar__toggle');
-		if (!toggle) {
-			return;
-		}
-
 		shell.classList.add('usa-announcement-shell--rotating');
 
 		var index = 0;
 		var timer = null;
-		var paused = sessionStorage.getItem(STORAGE_KEY) === '1';
 		var fading = false;
-
-		function setPaused(next) {
-			paused = next;
-			toggle.setAttribute('aria-pressed', paused ? 'true' : 'false');
-			toggle.textContent = paused ? toggle.getAttribute('data-label-resume') : toggle.getAttribute('data-label-pause');
-			try {
-				sessionStorage.setItem(STORAGE_KEY, paused ? '1' : '0');
-			} catch (e) {
-				/* ignore quota / private mode */
-			}
-			if (paused) {
-				stop();
-			} else if (document.visibilityState !== 'hidden') {
-				start();
-			}
-		}
-
-		var pauseLabel = toggle.textContent || 'Pause announcements';
-		var resumeLabel = toggle.getAttribute('data-label-resume') || 'Resume announcements';
-		toggle.setAttribute('data-label-pause', pauseLabel);
-		toggle.setAttribute('data-label-resume', resumeLabel);
 
 		function show(i) {
 			for (var n = 0; n < messages.length; n++) {
@@ -79,7 +53,7 @@
 		}
 
 		function advance() {
-			if (fading || paused || document.visibilityState === 'hidden') {
+			if (fading || document.visibilityState === 'hidden') {
 				return;
 			}
 			fading = true;
@@ -104,14 +78,10 @@
 			}
 		}
 
-		toggle.addEventListener('click', function () {
-			setPaused(!paused);
-		});
-
 		document.addEventListener('visibilitychange', function () {
 			if (document.visibilityState === 'hidden') {
 				stop();
-			} else if (!paused) {
+			} else {
 				start();
 			}
 		});
@@ -120,7 +90,7 @@
 			stop();
 		});
 		shell.addEventListener('mouseleave', function () {
-			if (!paused && document.visibilityState !== 'hidden') {
+			if (document.visibilityState !== 'hidden') {
 				start();
 			}
 		});
@@ -128,12 +98,12 @@
 			stop();
 		});
 		shell.addEventListener('focusout', function (event) {
-			if (!shell.contains(event.relatedTarget) && !paused && document.visibilityState !== 'hidden') {
+			if (!shell.contains(event.relatedTarget) && document.visibilityState !== 'hidden') {
 				start();
 			}
 		});
 
-		setPaused(paused);
+		start();
 	}
 
 	function boot() {
@@ -148,4 +118,4 @@
 	} else {
 		boot();
 	}
-})();
+}());

@@ -145,16 +145,12 @@ final class StoreNoticeRenderer {
 			return $result['html'];
 		}
 
-		$pause_label  = __( 'Pause announcements', 'universal-site-announcements' );
-		$resume_label = __( 'Resume announcements', 'universal-site-announcements' );
-		$button       = sprintf(
-			'<button type="button" class="usa-announcement-bar__toggle" aria-pressed="false" data-label-pause="%1$s" data-label-resume="%2$s">%3$s</button>',
-			esc_attr( $pause_label ),
-			esc_attr( $resume_label ),
-			esc_html( $pause_label )
-		);
-
-		return $this->replacer->wrap_shell( $result['html'], $button );
+		// No visible pause/resume control on the rotating bar (product
+		// decision: the button was judged distracting). Auto-advance still
+		// pauses itself on hover, keyboard focus, and a hidden tab
+		// (assets/js/announcement-bar.js), which remains a WCAG 2.2.2-
+		// compliant mechanism without a dedicated on-screen control.
+		return $this->replacer->wrap_shell( $result['html'], '' );
 	}
 
 	/**

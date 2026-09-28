@@ -81,7 +81,7 @@ final class StoreNoticeRendererFixedTest extends TestCase {
 
 		$this->assertStringContainsString( 'usa-announcement-shell', $html );
 		$this->assertStringContainsString( 'usa-announcement-bar__message is-active', $html );
-		$this->assertStringContainsString( 'usa-announcement-bar__toggle', $html );
+		$this->assertStringNotContainsString( 'usa-announcement-bar__toggle', $html );
 		$this->assertStringNotContainsString( 'usa-announcement-fixed', $html );
 	}
 
@@ -119,7 +119,8 @@ final class StoreNoticeRendererFixedTest extends TestCase {
 
 		$this->assertSame( 1, $this->paragraph_count( $html ) );
 		$this->assertStringContainsString( 'usa-announcement-shell', $html );
-		$this->assertMatchesRegularExpression( '/<\/p><button /', $html );
+		$this->assertStringNotContainsString( 'usa-announcement-bar__toggle', $html );
+		$this->assertMatchesRegularExpression( '/<\/p><\/div>/', $html );
 		$this->assertMatchesRegularExpression(
 			'/usa-announcement-fixed--above.*usa-announcement-bar__message is-active.*usa-announcement-fixed--below/s',
 			$html
