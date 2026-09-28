@@ -96,7 +96,7 @@ final class PaymentIconsToken implements TokenProvider {
 		$html = '<span class="usa-payment-icons">';
 		foreach ( self::ICONS as $key => $icon ) {
 			$html .= sprintf(
-				'<img class="usa-payment-icon usa-payment-icon--%1$s" src="%2$s" alt="%3$s" width="%4$d" height="%5$d" loading="lazy" decoding="async" />',
+				'<img class="usa-payment-icon usa-payment-icon--%1$s" src="%2$s" alt="%3$s" width="%4$d" height="%5$d" loading="eager" decoding="async" />',
 				esc_attr( $key ),
 				esc_url( $base . $key . '.svg' ),
 				esc_attr( $icon['label'] ),
