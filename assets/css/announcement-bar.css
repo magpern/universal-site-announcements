@@ -118,3 +118,42 @@
 		animation: none;
 	}
 }
+
+/* {{payment_icons}} merge tag: bundled payment-method logos, each on a light
+ * chip so the dark marks (e.g. Apple Pay) stay legible on any bar colour. */
+.usa-payment-icons {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	vertical-align: middle;
+	line-height: 1;
+}
+
+.usa-payment-icons img.usa-payment-icon {
+	display: block;
+	box-sizing: content-box;
+	width: auto;
+	height: 1.15em;
+	max-width: none;
+	margin: 0;
+	padding: 0.2em 0.35em;
+	border-radius: 0.3em;
+	background: #ffffff;
+	object-fit: contain;
+}
+
+.usa-payment-icons img.usa-payment-icon--applepay {
+	width: 2.7em;
+}
+
+.usa-payment-icons img.usa-payment-icon--googlepay {
+	width: 2.95em;
+}
+
+.usa-payment-icons img.usa-payment-icon--visa {
+	width: 2.45em;
+}
+
+.usa-payment-icons img.usa-payment-icon--mastercard {
+	width: 1.45em;
+}

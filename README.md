@@ -5,7 +5,7 @@ Generic WordPress plugin for a site-wide announcement bar: manual messages, safe
 **Repository:** [magpern/universal-site-announcements](https://github.com/magpern/universal-site-announcements)  
 **Text domain / slug:** `universal-site-announcements`  
 **PHP namespace:** `USA\`  
-**Version:** 0.5.1
+**Version:** 0.8.0
 
 ## Status
 
@@ -38,6 +38,7 @@ Announcement `post_content` is a template with optional merge tags:
 | `{{free_shipping_threshold}}` | WooCommerce free shipping only (exactly one required) | Formatted threshold HTML |
 | `{{product:ID}}` | Manual and free shipping | Public product title → permalink link |
 
+- `{{payment_icons}}` (no argument) renders the bundled Apple Pay, Google Pay, Visa and Mastercard logos. Images cannot be typed into announcement content; only this token can produce them, and only the plugin's own icon files are allowed in output.
 - Tokens may appear only in text content (including inside `<strong>` / `<em>`).
 - Tokens in HTML attributes, or `{{product:…}}` inside an existing `<a>`, are rejected and the announcement is suppressed.
 - Malformed `{{…}}` braces suppress the announcement (no literal-brace escape language).

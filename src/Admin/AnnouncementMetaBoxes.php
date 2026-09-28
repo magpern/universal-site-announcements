@@ -458,6 +458,9 @@ final class AnnouncementMetaBoxes {
 			<button type="button" class="button usa-insert-token" data-token="{{free_shipping_threshold}}">
 				<?php echo esc_html__( 'Free shipping threshold', 'universal-site-announcements' ); ?>
 			</button>
+			<button type="button" class="button usa-insert-token" data-token="{{payment_icons}}">
+				<?php echo esc_html__( 'Payment icons', 'universal-site-announcements' ); ?>
+			</button>
 			<button type="button" class="button usa-insert-product" id="usa-insert-product">
 				<?php echo esc_html__( 'Product link…', 'universal-site-announcements' ); ?>
 			</button>

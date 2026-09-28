@@ -33,6 +33,7 @@ use USA\Template\FreeShippingThresholdToken;
 use USA\Template\HtmlPlacementValidator;
 use USA\Template\MergeTagParser;
 use USA\Template\PageToken;
+use USA\Template\PaymentIconsToken;
 use USA\Template\ProductToken;
 use USA\Template\SourceTokenRules;
 use USA\Template\TemplateEngine;
@@ -87,6 +88,7 @@ final class Plugin {
 				new FreeShippingThresholdToken( $activity, $umc, $sanitizer ),
 				new ProductToken(),
 				new PageToken(),
+				new PaymentIconsToken(),
 			)
 		);
 

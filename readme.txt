@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.7.0
+Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.8.0 =
+* New `{{payment_icons}}` merge tag (and "Payment icons" button in the editor): renders the Apple Pay, Google Pay, Visa and Mastercard logos, for example "Now accepting {{payment_icons}}". The logos are bundled with the plugin and each sits on a light chip so it stays legible on any bar colour.
+* Announcement content still cannot contain images: the tag generates the markup itself, saved content keeps its narrow allowlist, and on output only the plugin's own payment-icon assets may appear as an image.
 
 = 0.7.0 =
 * New `{{page:ID}}` merge tag with a "Page link…" picker in the editor (mirrors the existing "Product link…" picker): inserts a page title linked to its current URL, resolved via `get_permalink()` at render time. Use it instead of pasting a page URL directly — a page URL baked into the template as plain text can't pick up a routing layer's translated slug (e.g. Universal Multilingual), while a token resolved at render time does.
