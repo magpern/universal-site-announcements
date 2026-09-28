@@ -23,6 +23,11 @@ final class SourceTokenRules {
 	public const TOKEN_PAGE = 'page';
 
 	/**
+	 * Bundled payment-method logos (Apple Pay, Google Pay, Visa, Mastercard).
+	 */
+	public const TOKEN_PAYMENT_ICONS = 'payment_icons';
+
+	/**
 	 * Validate token structure independent of persisted source.
 	 *
 	 * Allows zero or one free-shipping threshold token. Duplicates / unknowns fail.
@@ -55,6 +60,13 @@ final class SourceTokenRules {
 			if ( self::TOKEN_PAGE === $token->name ) {
 				if ( null === $token->arg || ! $this->is_positive_int_string( $token->arg ) ) {
 					return 'invalid_page_token';
+				}
+				continue;
+			}
+
+			if ( self::TOKEN_PAYMENT_ICONS === $token->name ) {
+				if ( null !== $token->arg ) {
+					return 'invalid_token_argument';
 				}
 				continue;
 			}
@@ -116,7 +128,7 @@ final class SourceTokenRules {
 	 * @return list<string>
 	 */
 	public function insertable_names(): array {
-		return array( self::TOKEN_FREE_SHIPPING, self::TOKEN_PRODUCT, self::TOKEN_PAGE );
+		return array( self::TOKEN_FREE_SHIPPING, self::TOKEN_PRODUCT, self::TOKEN_PAGE, self::TOKEN_PAYMENT_ICONS );
 	}
 
 	/**
