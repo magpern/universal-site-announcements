@@ -47,29 +47,6 @@
 	opacity: 0;
 }
 
-.usa-announcement-bar__toggle {
-	display: none;
-	position: absolute;
-	top: 50%;
-	right: 0.75rem;
-	transform: translateY(-50%);
-	z-index: 2;
-	margin: 0;
-	padding: 0.25rem 0.5rem;
-	font: inherit;
-	font-size: 0.75rem;
-	line-height: 1.2;
-	cursor: pointer;
-	border: 1px solid currentColor;
-	background: transparent;
-	color: inherit;
-	opacity: 0.85;
-}
-
-.usa-announcement-shell--rotating .usa-announcement-bar__toggle {
-	display: inline-block;
-}
-
 /* M6 fixed-slot rows: static, never animated, rendered inside the host <p>. */
 .usa-announcement-fixed {
 	display: block;

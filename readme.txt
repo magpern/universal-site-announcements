@@ -3,7 +3,7 @@ Contributors: magpern
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ Admin navigation: **Announcements** (All Announcements, Add New, Settings). Plug
 4. Open **Announcements** in wp-admin (or use the Plugins screen links) to manage messages and Settings.
 
 == Changelog ==
+
+= 0.8.1 =
+* Removed the "Pause announcements" / "Resume announcements" button from the rotating announcement bar — it was found distracting. The bar still auto-advances and still pauses itself on hover, keyboard focus, and a hidden browser tab (and never rotates when the visitor's OS asks for reduced motion), which remains a WCAG 2.2.2-compliant pause mechanism without a dedicated on-screen control.
+* No database or settings change.
 
 = 0.8.0 =
 * New `{{payment_icons}}` merge tag (and "Payment icons" button in the editor): renders the Apple Pay, Google Pay, Visa and Mastercard logos, for example "Now accepting {{payment_icons}}". The logos are bundled with the plugin and each sits on a light chip so it stays legible on any bar colour.
